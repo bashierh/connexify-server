@@ -104,7 +104,7 @@ def send_license_email(customer_email: str, license_key: str, expires_date: str,
             <p style="font-size: 24px; font-weight: bold; color: #22d3ee; letter-spacing: 2px; font-family: monospace; margin: 0;">{license_key}</p>
         </div>
         <p>License Duration: <strong>{duration_days} days</strong> (expires {expires_date[:10]})</p>
-        <p>Download: <a href="https://connexify.co.za/downloads" style="color: #3b82f6;">connexify.co.za/downloads</a></p>
+        <p>Download: <a href="https://www.connexify.co.za/downloads" style="color: #3b82f6;">www.connexify.co.za/downloads</a></p>
         <hr style="border: none; border-top: 1px solid #334155; margin: 24px 0;">
         <p style="font-size: 12px; color: #64748b; text-align: center;">Need help? Contact {SUPPORT_EMAIL}</p>
         <p style="font-size: 12px; color: #64748b; text-align: center;">&copy; {datetime.now().year} {COMPANY_NAME} (Pty) Ltd</p>

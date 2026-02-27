@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: license-connexify
+    name: connexify-server
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
