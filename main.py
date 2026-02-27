@@ -598,7 +598,7 @@ async def import_license(request: ImportLicenseRequest):
         'max_users': -1 if request.is_demo else 1
     }
     if request.hardware_id:
-        ACTIVATIONS_DB[request.license_key] = {
+        ACTIVATION_DATABASE[request.license_key] = {
             'hardware_id': request.hardware_id,
             'activated_at': datetime.now().isoformat()
         }
