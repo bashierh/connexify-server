@@ -1,0 +1,27 @@
+{
+  "licenses": {
+    "DEMO1-DEMO2-DEMO3-DEMO4-DEMO5": {
+      "key": "DEMO1-DEMO2-DEMO3-DEMO4-DEMO5",
+      "created_at": "2025-11-27T13:04:42.581745",
+      "expires": "2025-12-04T13:04:42.581782",
+      "active": true,
+      "customer_email": "demo@example.com",
+      "hardware_id": null,
+      "duration_days": 7,
+      "is_demo": true,
+      "max_users": -1
+    },
+    "8MCKM-GESPF-XRC6Y-LD7TD-G26HA": {
+      "key": "8MCKM-GESPF-XRC6Y-LD7TD-G26HA",
+      "created_at": "2025-11-27T13:12:36.683336",
+      "expires": "2026-11-27T13:12:36.683309",
+      "active": true,
+      "customer_email": "bashier.hendricks@gmail.com",
+      "hardware_id": null,
+      "duration_days": 365,
+      "is_demo": false,
+      "max_users": 1
+    }
+  },
+  "activations": {}
+}

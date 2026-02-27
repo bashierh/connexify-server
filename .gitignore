@@ -1,0 +1,6 @@
+*.deb
+*.exe
+*.AppImage
+*.dmg
+__pycache__/
+*.pyc
