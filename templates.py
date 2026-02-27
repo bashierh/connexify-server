@@ -350,8 +350,8 @@ Need a license key? <a href="/get-started" class="text-blue-400 hover:underline 
 <div class="card rounded-2xl p-8 border-blue-500/30 relative">
 <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full">Most Popular</div>
 <h3 class="text-lg font-semibold text-blue-400 mb-2">Professional</h3>
-<div class="text-4xl font-bold text-white mb-1">R500<span class="text-lg text-gray-500">/mo</span></div>
-<p class="text-gray-500 text-sm mb-2">Per installation</p>
+<div class="text-4xl font-bold text-white mb-1">R600<span class="text-lg text-gray-500">/year</span></div>
+<p class="text-gray-500 text-sm mb-2">Per license &bull; Multiple licenses available</p>
 <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 mb-6">
 <p class="text-emerald-400 text-xs font-medium">&#9889; Pay securely online with PayFast</p>
 </div>
@@ -408,7 +408,7 @@ Need a license key? <a href="/get-started" class="text-blue-400 hover:underline 
 <span class="text-white font-medium text-sm">Can I pay with PayFast?</span>
 <span class="faq-icon text-gray-400 text-xl font-light">+</span>
 </button>
-<div class="faq-body px-6 text-sm text-gray-400 leading-relaxed"><div class="pb-4">Yes! We support PayFast for secure online payments. Pay R500 for your Professional license using credit card, debit card, instant EFT, or other methods supported by PayFast. Select PayFast as your payment method during checkout in the Get Started wizard.</div></div>
+<div class="faq-body px-6 text-sm text-gray-400 leading-relaxed"><div class="pb-4">Yes! We support PayFast for secure online payments. Licenses are R600 per year each. You can choose how many licenses you need and for how long (minimum 1 year). Pay with credit card, debit card, instant EFT, or other methods supported by PayFast. Select PayFast as your payment method during checkout in the Get Started wizard.</div></div>
 </div>
 <div class="glass rounded-xl overflow-hidden">
 <button class="w-full flex items-center justify-between px-6 py-4 text-left" onclick="toggleFaq(this)">
@@ -591,8 +591,8 @@ GET_STARTED_TEMPLATE = """<!DOCTYPE html>
 <button onclick="selectPlan('professional')" class="plan-card glass rounded-xl p-6 text-left hover:border-blue-500/50 transition border-blue-500/30" data-plan="professional">
 <div class="text-[10px] text-blue-400 font-semibold mb-1">RECOMMENDED</div>
 <h3 class="text-white font-semibold mb-1">Professional</h3>
-<div class="text-2xl font-bold text-white mb-1">R500<span class="text-sm text-gray-500">/mo</span></div>
-<p class="text-gray-500 text-xs mb-3">Unlimited devices</p>
+<div class="text-2xl font-bold text-white mb-1">R600<span class="text-sm text-gray-500">/year</span></div>
+<p class="text-gray-500 text-xs mb-3">Per license &bull; Unlimited devices</p>
 <ul class="text-xs text-gray-400 space-y-1">
 <li>&#10003; Everything in Trial</li>
 <li>&#10003; Priority support</li>
@@ -667,10 +667,46 @@ GET_STARTED_TEMPLATE = """<!DOCTYPE html>
 
 <!-- Professional: payment options -->
 <div id="pay-professional" class="hidden max-w-lg mx-auto space-y-4">
-<div class="glass rounded-2xl p-6 text-center mb-6">
-<p class="text-gray-400 text-sm">Professional License</p>
-<div class="text-3xl font-bold text-white my-2">R500 <span class="text-lg text-gray-500">/ month</span></div>
-<p class="text-gray-500 text-xs">Unlimited devices &bull; All features &bull; Priority support</p>
+<div class="glass rounded-2xl p-6 mb-6">
+<p class="text-gray-400 text-sm text-center mb-4">Professional License</p>
+
+<!-- Quantity selector -->
+<div class="flex items-center justify-between bg-gray-900/40 rounded-xl p-4 mb-3">
+<div>
+<label class="text-white text-sm font-medium">Number of Licenses</label>
+<p class="text-gray-500 text-[11px]">Each license activates one installation</p>
+</div>
+<div class="flex items-center gap-3">
+<button onclick="changeQty(-1)" class="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 text-white text-lg flex items-center justify-center hover:border-blue-500 transition">-</button>
+<span id="qty-display" class="text-white font-bold text-lg w-8 text-center">1</span>
+<button onclick="changeQty(1)" class="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 text-white text-lg flex items-center justify-center hover:border-blue-500 transition">+</button>
+</div>
+</div>
+
+<!-- Duration selector -->
+<div class="flex items-center justify-between bg-gray-900/40 rounded-xl p-4 mb-4">
+<div>
+<label class="text-white text-sm font-medium">License Duration</label>
+<p class="text-gray-500 text-[11px]">Minimum 1 year</p>
+</div>
+<div class="flex items-center gap-3">
+<button onclick="changeDuration(-1)" class="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 text-white text-lg flex items-center justify-center hover:border-blue-500 transition">-</button>
+<span id="dur-display" class="text-white font-bold text-lg w-12 text-center">1 yr</span>
+<button onclick="changeDuration(1)" class="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 text-white text-lg flex items-center justify-center hover:border-blue-500 transition">+</button>
+</div>
+</div>
+
+<!-- Price summary -->
+<div class="border-t border-gray-700/50 pt-4">
+<div class="flex justify-between text-sm text-gray-400 mb-1">
+<span>R600 &times; <span id="price-qty">1</span> license(s) &times; <span id="price-dur">1</span> year(s)</span>
+</div>
+<div class="flex justify-between items-end">
+<span class="text-gray-400 text-sm">Total</span>
+<span id="price-total" class="text-3xl font-bold text-white">R600</span>
+</div>
+</div>
+<p class="text-gray-500 text-xs text-center mt-3">Unlimited devices per license &bull; All features &bull; Priority support</p>
 </div>
 
 <p class="text-center text-sm text-gray-400 mb-4">Choose your payment method:</p>
@@ -809,10 +845,34 @@ GET_STARTED_TEMPLATE = """<!DOCTYPE html>
 """ + _SHARED_JS + """
 <script>
 let currentStep=1, selectedPlan='', selectedPayment='';
+let licenseQty=1, licenseDuration=1;
+const PRICE_PER_LICENSE=600;
 
 // Check URL params for pre-selected plan
 const params=new URLSearchParams(window.location.search);
 if(params.get('plan')){selectPlan(params.get('plan'))}
+
+function changeQty(delta){
+  licenseQty=Math.max(1,Math.min(100,licenseQty+delta));
+  document.getElementById('qty-display').textContent=licenseQty;
+  updatePrice();
+}
+function changeDuration(delta){
+  licenseDuration=Math.max(1,Math.min(10,licenseDuration+delta));
+  document.getElementById('dur-display').textContent=licenseDuration+' yr'+(licenseDuration>1?'s':'');
+  updatePrice();
+}
+function updatePrice(){
+  const total=PRICE_PER_LICENSE*licenseQty*licenseDuration;
+  document.getElementById('price-qty').textContent=licenseQty;
+  document.getElementById('price-dur').textContent=licenseDuration;
+  document.getElementById('price-total').textContent='R'+total.toLocaleString();
+  // Update PayFast message if visible
+  const msg=document.getElementById('payment-msg');
+  if(selectedPayment==='payfast' && !msg.classList.contains('hidden')){
+    msg.innerHTML='<div class="text-emerald-400 font-medium mb-1">&#9889; PayFast Secure Checkout</div><p class="text-gray-400 text-xs">You\\'ll be redirected to PayFast to pay <strong class="text-white">R'+total.toLocaleString()+'</strong> for '+licenseQty+' license(s) x '+licenseDuration+' year(s). Your license key(s) will be generated and emailed automatically.</p>';
+  }
+}
 
 function selectPlan(plan){
   selectedPlan=plan;
@@ -830,7 +890,8 @@ function selectPayment(method){
   const msg=document.getElementById('payment-msg');
   msg.classList.remove('hidden');
   if(method==='payfast'){
-    msg.innerHTML='<div class="text-emerald-400 font-medium mb-1">&#9889; PayFast Secure Checkout</div><p class="text-gray-400 text-xs">You\\'ll be redirected to PayFast\\'s secure payment page to complete your R500 payment. Accepts credit cards, debit cards, instant EFT, and more. Your license key will be generated automatically after successful payment.</p>';
+    const total=PRICE_PER_LICENSE*licenseQty*licenseDuration;
+    msg.innerHTML='<div class="text-emerald-400 font-medium mb-1">&#9889; PayFast Secure Checkout</div><p class="text-gray-400 text-xs">You\\'ll be redirected to PayFast to pay <strong class="text-white">R'+total.toLocaleString()+'</strong> for '+licenseQty+' license(s) x '+licenseDuration+' year(s). Your license key(s) will be generated and emailed automatically.</p>';
   }else if(method==='eft'){
     msg.innerHTML='<div class="text-blue-400 font-medium mb-1">&#127974; EFT / Bank Transfer</div><p class="text-gray-400 text-xs mb-2">Banking Details:</p><div class="bg-gray-900/50 rounded-lg p-3 text-xs"><p><strong class="text-white">Bank:</strong> FNB</p><p><strong class="text-white">Account:</strong> __COMPANY__ (Pty) Ltd</p><p><strong class="text-white">Reference:</strong> Your email address</p></div><p class="text-gray-500 text-[11px] mt-2">License key will be emailed within 24 hours of payment confirmation.</p>';
   }else{
@@ -877,10 +938,10 @@ async function submitPayment(){
   if(!email){alert('Please go back and fill in your details');return}
 
   if(selectedPayment==='payfast' && selectedPlan==='professional'){
-    // Redirect to PayFast checkout
+    // Redirect to PayFast checkout with quantity and duration
     try{
       const res=await fetch('/api/payfast/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-        name,email,company,plan:selectedPlan
+        name,email,company,plan:selectedPlan,quantity:licenseQty,duration_years:licenseDuration
       })});
       const data=await res.json();
       if(data.redirect_url){
@@ -893,11 +954,12 @@ async function submitPayment(){
     }catch(e){alert('Payment error. Please try again.');return}
   }
 
-  // EFT / Invoice - just send contact form
+  // EFT / Invoice - send contact form with quantity and duration
+  const total=PRICE_PER_LICENSE*licenseQty*licenseDuration;
   try{
     await fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       name,email,company,subject:'License Order - '+selectedPlan+' ('+selectedPayment+')',
-      message:'Plan: '+selectedPlan+'\\nPayment: '+selectedPayment+'\\nDevices: '+(document.getElementById('gs-devices')?.value||'N/A')
+      message:'Plan: '+selectedPlan+'\\nPayment: '+selectedPayment+'\\nLicenses: '+licenseQty+'\\nDuration: '+licenseDuration+' year(s)\\nTotal: R'+total+'\\nDevices: '+(document.getElementById('gs-devices')?.value||'N/A')
     })});
   }catch(e){}
   nextStep(4);

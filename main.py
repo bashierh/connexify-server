@@ -136,6 +136,64 @@ def send_license_email(customer_email: str, license_key: str, expires_date: str,
     return True
 
 
+def send_multi_license_email(customer_email: str, license_keys: list, duration_days: int, duration_years: int):
+    """Send welcome email with one or more license keys."""
+    if not SMTP_USER or not SMTP_PASS:
+        print("Email not configured, skipping")
+        return False
+
+    expires_date = (datetime.now() + timedelta(days=duration_days)).strftime('%Y-%m-%d')
+    qty = len(license_keys)
+
+    # Build license keys HTML block
+    keys_html = ""
+    for i, key in enumerate(license_keys, 1):
+        label = f"License Key {i} of {qty}" if qty > 1 else "Your License Key"
+        keys_html += f"""
+        <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 24px; margin: 16px 0; text-align: center;">
+            <p style="color: #94a3b8; margin: 0 0 8px; font-size: 13px;">{label}</p>
+            <p style="font-size: 22px; font-weight: bold; color: #22d3ee; letter-spacing: 2px; font-family: monospace; margin: 0;">{key}</p>
+        </div>"""
+
+    summary = f"{qty} license(s)" if qty > 1 else "1 license"
+    duration_label = f"{duration_years} year{'s' if duration_years > 1 else ''}"
+
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f172a; color: #e2e8f0; padding: 40px; border-radius: 12px;">
+        <h1 style="color: #3b82f6; text-align: center;">Welcome to Connexa</h1>
+        <p style="text-align: center; color: #94a3b8;">Professional Network Management Platform</p>
+        <div style="background: #1e293b; border-radius: 8px; padding: 16px; margin: 20px 0; text-align: center;">
+            <p style="color: #94a3b8; margin: 0;">Order Summary: <strong style="color: #fff;">{summary}</strong> &bull; <strong style="color: #fff;">{duration_label}</strong> &bull; Expires <strong style="color: #fff;">{expires_date}</strong></p>
+        </div>
+        {keys_html}
+        <p style="margin-top: 24px;"><strong>How to activate:</strong></p>
+        <ol style="color: #94a3b8; font-size: 14px;">
+            <li>Download Connexa from <a href="https://www.connexify.co.za/downloads" style="color: #3b82f6;">connexify.co.za/downloads</a></li>
+            <li>Install and launch the application</li>
+            <li>Enter your license key when prompted</li>
+            <li>Each license activates one installation</li>
+        </ol>
+        <hr style="border: none; border-top: 1px solid #334155; margin: 24px 0;">
+        <p style="font-size: 12px; color: #64748b; text-align: center;">Need help? Contact {SUPPORT_EMAIL}</p>
+        <p style="font-size: 12px; color: #64748b; text-align: center;">&copy; {datetime.now().year} {COMPANY_NAME} (Pty) Ltd</p>
+    </div>
+    """
+
+    subject = f"Welcome to Connexa - Your {summary}" if qty > 1 else "Welcome to Connexa - Your License Key"
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = f'{FROM_NAME} <{FROM_EMAIL}>'
+    msg['To'] = customer_email
+    msg.attach(MIMEText(html, 'html'))
+
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+        server.starttls()
+        server.login(SMTP_USER, SMTP_PASS)
+        server.sendmail(FROM_EMAIL, customer_email, msg.as_string())
+
+    return True
+
+
 # ── Pydantic Models ──
 
 class LicenseValidationRequest(BaseModel):
@@ -285,6 +343,8 @@ class PayFastCheckoutRequest(BaseModel):
     email: str
     company: str = ""
     plan: str = "professional"
+    quantity: int = 1
+    duration_years: int = 1
 
 
 @app.post("/api/payfast/checkout")
@@ -293,8 +353,17 @@ async def payfast_checkout(request: PayFastCheckoutRequest):
     if request.plan != "professional":
         raise HTTPException(status_code=400, detail="Only professional plan supports online payment")
 
+    qty = max(1, min(100, request.quantity))
+    years = max(1, min(10, request.duration_years))
+    price_per_license = 600  # R600 per license per year
+    total = price_per_license * qty * years
+    duration_days = years * 365
+
     # Unique payment ID for tracking
     payment_id = secrets.token_hex(8)
+
+    item_name = f"Connexa Professional License x{qty} ({years}yr{'s' if years > 1 else ''})"
+    item_desc = f"{qty} license(s), {years} year(s), unlimited devices, all features"
 
     # Build PayFast data dict (ORDER MATTERS for signature)
     data = {
@@ -307,12 +376,14 @@ async def payfast_checkout(request: PayFastCheckoutRequest):
         "name_last": " ".join(request.name.split()[1:]) if len(request.name.split()) > 1 else "",
         "email_address": request.email,
         "m_payment_id": payment_id,
-        "amount": "500.00",
-        "item_name": "Connexa Professional License - 1 Year",
-        "item_description": "Unlimited devices, all features, priority support",
+        "amount": f"{total:.2f}",
+        "item_name": item_name[:100],
+        "item_description": item_desc[:255],
         "custom_str1": request.email,
         "custom_str2": request.company,
         "custom_str3": request.plan,
+        "custom_int1": str(qty),
+        "custom_int2": str(years),
     }
 
     # Generate signature
@@ -343,39 +414,48 @@ async def payfast_notify(request: Request):
     company = data.get("custom_str2", "")
     name_first = data.get("name_first", "")
     name_last = data.get("name_last", "")
+    qty = int(data.get("custom_int1", "1") or "1")
+    years = int(data.get("custom_int2", "1") or "1")
+    duration_days = years * 365
 
     if payment_status == "COMPLETE":
-        # Payment successful — generate license
-        license_key = generate_license_key()
-        expires = datetime.now() + timedelta(days=365)
+        # Payment successful — generate N licenses
+        license_keys = []
+        for _ in range(qty):
+            license_key = generate_license_key()
+            expires = datetime.now() + timedelta(days=duration_days)
 
-        LICENSE_DATABASE[license_key] = {
-            'key': license_key,
-            'created_at': datetime.now().isoformat(),
-            'expires': expires.isoformat(),
-            'active': True,
-            'customer_email': customer_email,
-            'hardware_id': None,
-            'duration_days': 365,
-            'is_demo': False,
-            'max_users': 1,
-            'payment': {
-                'method': 'payfast',
-                'pf_payment_id': pf_payment_id,
-                'm_payment_id': m_payment_id,
-                'amount': amount_gross,
-                'customer_name': f"{name_first} {name_last}".strip(),
-                'company': company,
-                'completed_at': datetime.now().isoformat()
+            LICENSE_DATABASE[license_key] = {
+                'key': license_key,
+                'created_at': datetime.now().isoformat(),
+                'expires': expires.isoformat(),
+                'active': True,
+                'customer_email': customer_email,
+                'hardware_id': None,
+                'duration_days': duration_days,
+                'is_demo': False,
+                'max_users': 1,
+                'payment': {
+                    'method': 'payfast',
+                    'pf_payment_id': pf_payment_id,
+                    'm_payment_id': m_payment_id,
+                    'amount': amount_gross,
+                    'quantity': qty,
+                    'duration_years': years,
+                    'customer_name': f"{name_first} {name_last}".strip(),
+                    'company': company,
+                    'completed_at': datetime.now().isoformat()
+                }
             }
-        }
-        save_database()
-        print(f"[PayFast ITN] License created: {license_key} for {customer_email}")
+            license_keys.append(license_key)
 
-        # Send license email
+        save_database()
+        print(f"[PayFast ITN] {qty} license(s) created for {customer_email}: {license_keys}")
+
+        # Send license email with all keys
         if SMTP_USER and customer_email:
             try:
-                send_license_email(customer_email, license_key, expires.isoformat(), 365)
+                send_multi_license_email(customer_email, license_keys, duration_days, years)
                 print(f"[PayFast ITN] License email sent to {customer_email}")
             except Exception as e:
                 print(f"[PayFast ITN] Email error: {e}")
