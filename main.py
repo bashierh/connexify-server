@@ -42,6 +42,8 @@ LICENSE_DB_FILE = Path(os.getenv("LICENSE_DB_FILE", "/opt/render/project/data/li
 if not LICENSE_DB_FILE.parent.exists():
     LICENSE_DB_FILE = Path("./license_database.json")
 
+DATA_DIR = str(LICENSE_DB_FILE.parent)
+
 ADMIN_TOKEN = os.getenv("ADMIN_SECRET_TOKEN", "your-admin-secret-token-change-this")
 CURRENT_VERSION = os.getenv("CONNEXA_VERSION", "5.2.8")
 SMTP_HOST = os.getenv("SMTP_HOST", "mail.connexify.co.za")
