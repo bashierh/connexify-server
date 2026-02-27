@@ -8,17 +8,17 @@ services:
       - key: ADMIN_SECRET_TOKEN
         sync: false
       - key: SMTP_HOST
-        value: smtp.gmail.com
+        value: mail.connexify.co.za
       - key: SMTP_PORT
         value: "587"
       - key: SMTP_USER
-        sync: false
+        value: admin@connexify.co.za
       - key: SMTP_PASSWORD
         sync: false
       - key: FROM_EMAIL
-        sync: false
+        value: admin@connexify.co.za
       - key: FROM_NAME
-        value: Bashier Hendricks
+        value: Connexify
       - key: COMPANY_NAME
         value: Connexify
       - key: SUPPORT_EMAIL

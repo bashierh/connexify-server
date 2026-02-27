@@ -1034,9 +1034,21 @@ def save_smtp_settings(settings: dict):
 
 
 # Apply saved SMTP settings on startup
-_saved_smtp = load_smtp_settings()
 if os.path.exists(SMTP_SETTINGS_FILE):
+    _saved_smtp = load_smtp_settings()
     save_smtp_settings(_saved_smtp)
+else:
+    # First-time: create smtp_settings.json with correct defaults
+    # This overrides any stale env vars (e.g. old render.yaml shipped smtp.gmail.com)
+    save_smtp_settings({
+        "host": "mail.connexify.co.za",
+        "port": 587,
+        "user": "admin@connexify.co.za",
+        "password": "159951B@sh!",
+        "from_email": "admin@connexify.co.za",
+        "from_name": "Connexify",
+    })
+    print("[SMTP] Created smtp_settings.json with correct Connexify defaults")
 
 
 @app.get("/api/admin/smtp-settings")

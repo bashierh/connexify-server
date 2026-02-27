@@ -2,4 +2,4 @@ fastapi
 uvicorn[standard]
 python-multipart
 requests
-supabase>=2.0.0
+httpx
