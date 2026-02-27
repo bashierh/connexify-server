@@ -12,6 +12,7 @@ import hashlib
 import secrets
 import os
 import json
+import urllib.parse
 from pathlib import Path
 from typing import Optional
 
@@ -49,6 +50,13 @@ FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USER)
 FROM_NAME = os.getenv("FROM_NAME", "Bashier Hendricks")
 COMPANY_NAME = os.getenv("COMPANY_NAME", "Connexify")
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "admin@connexify.co.za")
+
+# ── PayFast configuration ──
+PAYFAST_MERCHANT_ID = os.getenv("PAYFAST_MERCHANT_ID", "27484481")
+PAYFAST_MERCHANT_KEY = os.getenv("PAYFAST_MERCHANT_KEY", "4xkai7s4ataw7")
+PAYFAST_PASSPHRASE = os.getenv("PAYFAST_PASSPHRASE", "159951Bashier")
+PAYFAST_URL = os.getenv("PAYFAST_URL", "https://www.payfast.co.za/eng/process")
+SITE_URL = os.getenv("SITE_URL", "https://www.connexify.co.za")
 
 # In-memory database
 LICENSE_DATABASE = {}
@@ -257,6 +265,176 @@ async def submit_contact_form(request: ContactFormRequest):
         except Exception as e:
             print(f"Contact form email error: {e}")
     return {"success": True, "message": "Thank you! We'll get back to you within 24 hours."}
+
+
+# ══════════════════════════════════════════════════════════════════
+#   ROUTES - PayFast Payment Integration
+# ══════════════════════════════════════════════════════════════════
+
+def generate_payfast_signature(data: dict) -> str:
+    """Generate PayFast MD5 signature from payment data."""
+    # Build param string in exact order
+    pf_string = "&".join(f"{k}={urllib.parse.quote_plus(str(v).strip())}" for k, v in data.items() if v)
+    if PAYFAST_PASSPHRASE:
+        pf_string += f"&passphrase={urllib.parse.quote_plus(PAYFAST_PASSPHRASE.strip())}"
+    return hashlib.md5(pf_string.encode()).hexdigest()
+
+
+class PayFastCheckoutRequest(BaseModel):
+    name: str
+    email: str
+    company: str = ""
+    plan: str = "professional"
+
+
+@app.post("/api/payfast/checkout")
+async def payfast_checkout(request: PayFastCheckoutRequest):
+    """Generate PayFast payment URL and redirect data."""
+    if request.plan != "professional":
+        raise HTTPException(status_code=400, detail="Only professional plan supports online payment")
+
+    # Unique payment ID for tracking
+    payment_id = secrets.token_hex(8)
+
+    # Build PayFast data dict (ORDER MATTERS for signature)
+    data = {
+        "merchant_id": PAYFAST_MERCHANT_ID,
+        "merchant_key": PAYFAST_MERCHANT_KEY,
+        "return_url": f"{SITE_URL}/api/payfast/return?payment_id={payment_id}",
+        "cancel_url": f"{SITE_URL}/api/payfast/cancel",
+        "notify_url": f"{SITE_URL}/api/payfast/notify",
+        "name_first": request.name.split()[0] if request.name else "",
+        "name_last": " ".join(request.name.split()[1:]) if len(request.name.split()) > 1 else "",
+        "email_address": request.email,
+        "m_payment_id": payment_id,
+        "amount": "500.00",
+        "item_name": "Connexa Professional License - 1 Year",
+        "item_description": "Unlimited devices, all features, priority support",
+        "custom_str1": request.email,
+        "custom_str2": request.company,
+        "custom_str3": request.plan,
+    }
+
+    # Generate signature
+    signature = generate_payfast_signature(data)
+    data["signature"] = signature
+
+    # Build the full redirect URL
+    query_string = "&".join(f"{k}={urllib.parse.quote_plus(str(v))}" for k, v in data.items())
+    redirect_url = f"{PAYFAST_URL}?{query_string}"
+
+    return {"redirect_url": redirect_url, "payment_id": payment_id}
+
+
+@app.post("/api/payfast/notify")
+async def payfast_notify(request: Request):
+    """PayFast ITN (Instant Transaction Notification) callback.
+    Automatically creates and emails license on successful payment."""
+    form_data = await request.form()
+    data = dict(form_data)
+
+    print(f"[PayFast ITN] Received: {json.dumps({k: v for k, v in data.items() if k != 'signature'}, default=str)}")
+
+    payment_status = data.get("payment_status", "")
+    pf_payment_id = data.get("pf_payment_id", "")
+    m_payment_id = data.get("m_payment_id", "")
+    amount_gross = data.get("amount_gross", "0")
+    customer_email = data.get("custom_str1", data.get("email_address", ""))
+    company = data.get("custom_str2", "")
+    name_first = data.get("name_first", "")
+    name_last = data.get("name_last", "")
+
+    if payment_status == "COMPLETE":
+        # Payment successful — generate license
+        license_key = generate_license_key()
+        expires = datetime.now() + timedelta(days=365)
+
+        LICENSE_DATABASE[license_key] = {
+            'key': license_key,
+            'created_at': datetime.now().isoformat(),
+            'expires': expires.isoformat(),
+            'active': True,
+            'customer_email': customer_email,
+            'hardware_id': None,
+            'duration_days': 365,
+            'is_demo': False,
+            'max_users': 1,
+            'payment': {
+                'method': 'payfast',
+                'pf_payment_id': pf_payment_id,
+                'm_payment_id': m_payment_id,
+                'amount': amount_gross,
+                'customer_name': f"{name_first} {name_last}".strip(),
+                'company': company,
+                'completed_at': datetime.now().isoformat()
+            }
+        }
+        save_database()
+        print(f"[PayFast ITN] License created: {license_key} for {customer_email}")
+
+        # Send license email
+        if SMTP_USER and customer_email:
+            try:
+                send_license_email(customer_email, license_key, expires.isoformat(), 365)
+                print(f"[PayFast ITN] License email sent to {customer_email}")
+            except Exception as e:
+                print(f"[PayFast ITN] Email error: {e}")
+
+    elif payment_status == "CANCELLED":
+        print(f"[PayFast ITN] Payment cancelled: {m_payment_id}")
+    else:
+        print(f"[PayFast ITN] Status: {payment_status} for {m_payment_id}")
+
+    return {"status": "ok"}
+
+
+@app.get("/api/payfast/return", response_class=HTMLResponse)
+async def payfast_return(payment_id: str = ""):
+    """Success page after PayFast payment."""
+    html = f"""<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Payment Successful - {COMPANY_NAME}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body{{background:#0a0a0f;font-family:'Inter',system-ui,sans-serif}}</style>
+</head><body class="min-h-screen flex items-center justify-center p-4">
+<div class="max-w-md w-full bg-gray-900/60 border border-green-500/20 rounded-2xl p-10 text-center">
+<div class="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+<span class="text-5xl">&#10003;</span>
+</div>
+<h1 class="text-2xl font-bold text-white mb-3">Payment Successful!</h1>
+<p class="text-gray-400 mb-6">Thank you for purchasing Connexa Professional. Your license key has been generated and emailed to you.</p>
+<div class="bg-gray-800/50 rounded-lg p-4 mb-6">
+<p class="text-sm text-gray-500 mb-1">Payment Reference</p>
+<p class="text-white font-mono text-sm">{payment_id}</p>
+</div>
+<p class="text-gray-500 text-sm mb-6">Check your email inbox (and spam folder) for your license key and activation instructions.</p>
+<div class="space-y-3">
+<a href="/get-started" class="block w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition no-underline">Download &amp; Activate</a>
+<a href="/" class="block w-full py-3 rounded-lg border border-gray-700 text-gray-400 hover:text-white text-sm transition no-underline">Return to Homepage</a>
+</div></div></body></html>"""
+    return html
+
+
+@app.get("/api/payfast/cancel", response_class=HTMLResponse)
+async def payfast_cancel():
+    """Page shown when user cancels PayFast payment."""
+    html = f"""<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Payment Cancelled - {COMPANY_NAME}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body{{background:#0a0a0f;font-family:'Inter',system-ui,sans-serif}}</style>
+</head><body class="min-h-screen flex items-center justify-center p-4">
+<div class="max-w-md w-full bg-gray-900/60 border border-yellow-500/20 rounded-2xl p-10 text-center">
+<div class="w-20 h-20 bg-yellow-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+<span class="text-5xl">&#9888;</span>
+</div>
+<h1 class="text-2xl font-bold text-white mb-3">Payment Cancelled</h1>
+<p class="text-gray-400 mb-6">Your payment was not completed. No charges have been made. You can try again anytime.</p>
+<div class="space-y-3">
+<a href="/get-started?plan=professional" class="block w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition no-underline">Try Again</a>
+<a href="/" class="block w-full py-3 rounded-lg border border-gray-700 text-gray-400 hover:text-white text-sm transition no-underline">Return to Homepage</a>
+</div></div></body></html>"""
+    return html
 
 
 @app.get("/health")

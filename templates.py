@@ -353,7 +353,7 @@ Need a license key? <a href="/get-started" class="text-blue-400 hover:underline 
 <div class="text-4xl font-bold text-white mb-1">R500<span class="text-lg text-gray-500">/mo</span></div>
 <p class="text-gray-500 text-sm mb-2">Per installation</p>
 <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 mb-6">
-<p class="text-emerald-400 text-xs font-medium">&#9889; Pay in 4 interest-free instalments of R125 with PayFlex</p>
+<p class="text-emerald-400 text-xs font-medium">&#9889; Pay securely online with PayFast</p>
 </div>
 <ul class="space-y-3 text-sm text-gray-400 mb-8">
 <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> Unlimited devices</li>
@@ -405,10 +405,10 @@ Need a license key? <a href="/get-started" class="text-blue-400 hover:underline 
 </div>
 <div class="glass rounded-xl overflow-hidden">
 <button class="w-full flex items-center justify-between px-6 py-4 text-left" onclick="toggleFaq(this)">
-<span class="text-white font-medium text-sm">Can I pay with PayFlex?</span>
+<span class="text-white font-medium text-sm">Can I pay with PayFast?</span>
 <span class="faq-icon text-gray-400 text-xl font-light">+</span>
 </button>
-<div class="faq-body px-6 text-sm text-gray-400 leading-relaxed"><div class="pb-4">Yes! We support PayFlex for Professional licenses. Pay R500/month in 4 interest-free instalments of R125 each. Select PayFlex as your payment method during checkout in the Get Started wizard.</div></div>
+<div class="faq-body px-6 text-sm text-gray-400 leading-relaxed"><div class="pb-4">Yes! We support PayFast for secure online payments. Pay R500 for your Professional license using credit card, debit card, instant EFT, or other methods supported by PayFast. Select PayFast as your payment method during checkout in the Get Started wizard.</div></div>
 </div>
 <div class="glass rounded-xl overflow-hidden">
 <button class="w-full flex items-center justify-between px-6 py-4 text-left" onclick="toggleFaq(this)">
@@ -597,7 +597,7 @@ GET_STARTED_TEMPLATE = """<!DOCTYPE html>
 <li>&#10003; Everything in Trial</li>
 <li>&#10003; Priority support</li>
 <li>&#10003; Zabbix integration</li>
-<li>&#9889; PayFlex: 4 x R125</li>
+<li>&#9889; PayFast secure checkout</li>
 </ul>
 </button>
 <button onclick="selectPlan('enterprise')" class="plan-card glass rounded-xl p-6 text-left hover:border-blue-500/50 transition" data-plan="enterprise">
@@ -675,13 +675,13 @@ GET_STARTED_TEMPLATE = """<!DOCTYPE html>
 
 <p class="text-center text-sm text-gray-400 mb-4">Choose your payment method:</p>
 
-<!-- PayFlex -->
-<button onclick="selectPayment('payflex')" class="pay-opt w-full glass rounded-xl p-5 flex items-center gap-4 text-left hover:border-emerald-500/40 transition" data-method="payflex">
+<!-- PayFast -->
+<button onclick="selectPayment('payfast')" class="pay-opt w-full glass rounded-xl p-5 flex items-center gap-4 text-left hover:border-emerald-500/40 transition" data-method="payfast">
 <div class="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-2xl flex-shrink-0">&#9889;</div>
 <div class="flex-1">
-<h4 class="text-white font-medium text-sm">PayFlex</h4>
-<p class="text-emerald-400 text-xs">4 interest-free payments of R125</p>
-<p class="text-gray-500 text-[11px] mt-0.5">Pay over 6 weeks with no fees</p>
+<h4 class="text-white font-medium text-sm">PayFast</h4>
+<p class="text-emerald-400 text-xs">Credit card, debit card, instant EFT &amp; more</p>
+<p class="text-gray-500 text-[11px] mt-0.5">Secure payment powered by PayFast</p>
 </div>
 <div class="w-5 h-5 rounded-full border-2 border-gray-600 flex-shrink-0 pay-radio"></div>
 </button>
@@ -829,8 +829,8 @@ function selectPayment(method){
   });
   const msg=document.getElementById('payment-msg');
   msg.classList.remove('hidden');
-  if(method==='payflex'){
-    msg.innerHTML='<div class="text-emerald-400 font-medium mb-1">&#9889; PayFlex - Pay in 4</div><p class="text-gray-400 text-xs">After confirmation, you\\'ll receive a PayFlex payment link via email. Pay your first instalment of R125 and your license activates immediately. The remaining 3 payments are collected automatically every 2 weeks.</p>';
+  if(method==='payfast'){
+    msg.innerHTML='<div class="text-emerald-400 font-medium mb-1">&#9889; PayFast Secure Checkout</div><p class="text-gray-400 text-xs">You\\'ll be redirected to PayFast\\'s secure payment page to complete your R500 payment. Accepts credit cards, debit cards, instant EFT, and more. Your license key will be generated automatically after successful payment.</p>';
   }else if(method==='eft'){
     msg.innerHTML='<div class="text-blue-400 font-medium mb-1">&#127974; EFT / Bank Transfer</div><p class="text-gray-400 text-xs mb-2">Banking Details:</p><div class="bg-gray-900/50 rounded-lg p-3 text-xs"><p><strong class="text-white">Bank:</strong> FNB</p><p><strong class="text-white">Account:</strong> __COMPANY__ (Pty) Ltd</p><p><strong class="text-white">Reference:</strong> Your email address</p></div><p class="text-gray-500 text-[11px] mt-2">License key will be emailed within 24 hours of payment confirmation.</p>';
   }else{
@@ -875,6 +875,25 @@ async function submitPayment(){
   const email=document.getElementById('gs-email')?.value||'';
   const company=document.getElementById('gs-company')?.value||'';
   if(!email){alert('Please go back and fill in your details');return}
+
+  if(selectedPayment==='payfast' && selectedPlan==='professional'){
+    // Redirect to PayFast checkout
+    try{
+      const res=await fetch('/api/payfast/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        name,email,company,plan:selectedPlan
+      })});
+      const data=await res.json();
+      if(data.redirect_url){
+        window.location.href=data.redirect_url;
+        return;
+      }else{
+        alert(data.detail||'Payment error. Please try again.');
+        return;
+      }
+    }catch(e){alert('Payment error. Please try again.');return}
+  }
+
+  // EFT / Invoice - just send contact form
   try{
     await fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       name,email,company,subject:'License Order - '+selectedPlan+' ('+selectedPayment+')',
