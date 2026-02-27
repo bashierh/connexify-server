@@ -390,11 +390,7 @@ async def payfast_checkout(request: PayFastCheckoutRequest):
     signature = generate_payfast_signature(data)
     data["signature"] = signature
 
-    # Build the full redirect URL
-    query_string = "&".join(f"{k}={urllib.parse.quote_plus(str(v))}" for k, v in data.items())
-    redirect_url = f"{PAYFAST_URL}?{query_string}"
-
-    return {"redirect_url": redirect_url, "payment_id": payment_id}
+    return {"form_fields": data, "payfast_url": PAYFAST_URL, "payment_id": payment_id}
 
 
 @app.post("/api/payfast/notify")

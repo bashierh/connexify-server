@@ -938,14 +938,26 @@ async function submitPayment(){
   if(!email){alert('Please go back and fill in your details');return}
 
   if(selectedPayment==='payfast' && selectedPlan==='professional'){
-    // Redirect to PayFast checkout with quantity and duration
+    // POST form to PayFast with quantity and duration
     try{
       const res=await fetch('/api/payfast/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
         name,email,company,plan:selectedPlan,quantity:licenseQty,duration_years:licenseDuration
       })});
       const data=await res.json();
-      if(data.redirect_url){
-        window.location.href=data.redirect_url;
+      if(data.form_fields && data.payfast_url){
+        // Create hidden form and POST to PayFast
+        const form=document.createElement('form');
+        form.method='POST';
+        form.action=data.payfast_url;
+        for(const [key,val] of Object.entries(data.form_fields)){
+          const input=document.createElement('input');
+          input.type='hidden';
+          input.name=key;
+          input.value=val;
+          form.appendChild(input);
+        }
+        document.body.appendChild(form);
+        form.submit();
         return;
       }else{
         alert(data.detail||'Payment error. Please try again.');
