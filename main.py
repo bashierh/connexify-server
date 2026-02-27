@@ -20,6 +20,9 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+# ── Website templates ──
+from templates import WEBSITE_TEMPLATE, GET_STARTED_TEMPLATE, DOCS_TEMPLATE
+
 app = FastAPI(title="Connexa License Server", version="1.0.0")
 
 app.add_middleware(
@@ -190,270 +193,19 @@ async def startup_event():
 
 
 # ══════════════════════════════════════════════════════════════════
-#   CONNEXIFY WEBSITE (landing page)
+#   WEBSITE HTML (built from templates)
 # ══════════════════════════════════════════════════════════════════
 
-WEBSITE_HTML = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connexify (Pty) Ltd - Network Management Solutions</title>
-    <meta name="description" content="Connexify provides Connexa, a professional network management platform for ISPs and WISPs. Monitor towers, manage devices, automate scripts, and track wireless clients.">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <style>
-        * {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }}
-        body {{ background: #030712; color: #e2e8f0; }}
-        .hero-gradient {{ background: radial-gradient(ellipse at top, #1e3a5f 0%, #030712 70%); }}
-        .gradient-text {{ background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 50%, #10b981 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }}
-        .card {{ background: rgba(15,23,42,0.6); backdrop-filter: blur(12px); border: 1px solid rgba(71,85,105,0.3); transition: all 0.3s ease; }}
-        .card:hover {{ border-color: rgba(59,130,246,0.4); transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }}
-        .glow-btn {{ background: linear-gradient(135deg, #3b82f6, #06b6d4); transition: all 0.3s ease; }}
-        .glow-btn:hover {{ transform: scale(1.05); box-shadow: 0 10px 40px rgba(59,130,246,0.4); }}
-        .download-card {{ background: rgba(15,23,42,0.8); border: 1px solid rgba(71,85,105,0.4); }}
-        .download-card:hover {{ border-color: rgba(59,130,246,0.6); box-shadow: 0 15px 30px rgba(0,0,0,0.3); }}
-        .section-divider {{ border-top: 1px solid rgba(71,85,105,0.2); }}
-        @keyframes float {{ 0%,100% {{ transform: translateY(0px); }} 50% {{ transform: translateY(-10px); }} }}
-        .float-animation {{ animation: float 6s ease-in-out infinite; }}
-    </style>
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="fixed top-0 w-full z-50 bg-gray-950/80 backdrop-blur-lg border-b border-gray-800/50">
-        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <img src="/static/connexa-helmet-logo.png" alt="Connexify" class="w-10 h-10 rounded-lg object-contain">
-                <div>
-                    <span class="text-xl font-bold text-white">Connexify</span>
-                    <span class="text-[10px] text-gray-500 block -mt-1">(Pty) Ltd</span>
-                </div>
-            </div>
-            <div class="hidden md:flex items-center gap-8 text-sm text-gray-400">
-                <a href="#features" class="hover:text-white transition">Features</a>
-                <a href="#downloads" class="hover:text-white transition">Downloads</a>
-                <a href="#pricing" class="hover:text-white transition">Pricing</a>
-                <a href="#contact" class="hover:text-white transition">Contact</a>
-            </div>
-            <a href="#downloads" class="glow-btn px-5 py-2 rounded-lg text-white text-sm font-medium">Download</a>
-        </div>
-    </nav>
+def _render_template(template: str) -> str:
+    return (template
+        .replace("__VERSION__", CURRENT_VERSION)
+        .replace("__EMAIL__", SUPPORT_EMAIL)
+        .replace("__YEAR__", str(datetime.now().year))
+        .replace("__COMPANY__", COMPANY_NAME))
 
-    <!-- Hero Section -->
-    <section class="hero-gradient min-h-screen flex items-center pt-20">
-        <div class="max-w-7xl mx-auto px-6 py-20 grid lg:grid-cols-2 gap-16 items-center">
-            <div>
-                <div class="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 text-blue-400 px-4 py-1.5 rounded-full text-sm mb-6">
-                    <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                    Version {CURRENT_VERSION} Now Available
-                </div>
-                <h1 class="text-5xl lg:text-6xl font-extrabold leading-tight mb-6">
-                    <span class="gradient-text">Professional</span><br>
-                    Network Management
-                </h1>
-                <p class="text-lg text-gray-400 leading-relaxed mb-8 max-w-lg">
-                    Monitor your towers, manage devices, automate configurations, and track wireless clients &mdash; all from one beautiful dashboard built for ISPs and WISPs.
-                </p>
-                <div class="flex flex-wrap gap-4">
-                    <a href="#downloads" class="glow-btn px-8 py-3 rounded-xl text-white font-semibold text-lg inline-flex items-center gap-2">
-                        &#11015; Download Free Trial
-                    </a>
-                    <a href="#features" class="px-8 py-3 rounded-xl border border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white transition font-medium">
-                        Learn More &rarr;
-                    </a>
-                </div>
-            </div>
-            <div class="hidden lg:flex justify-center">
-                <div class="float-animation relative">
-                    <div class="w-96 h-64 rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 shadow-2xl p-6 space-y-4">
-                        <div class="flex items-center gap-2">
-                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
-                            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-                            <div class="w-3 h-3 rounded-full bg-green-500"></div>
-                            <span class="text-xs text-gray-500 ml-2">Connexa Dashboard</span>
-                        </div>
-                        <div class="grid grid-cols-3 gap-3">
-                            <div class="bg-gray-800/80 rounded-lg p-3 text-center">
-                                <div class="text-2xl font-bold text-blue-400">24</div>
-                                <div class="text-[10px] text-gray-500">Towers</div>
-                            </div>
-                            <div class="bg-gray-800/80 rounded-lg p-3 text-center">
-                                <div class="text-2xl font-bold text-green-400">847</div>
-                                <div class="text-[10px] text-gray-500">Clients</div>
-                            </div>
-                            <div class="bg-gray-800/80 rounded-lg p-3 text-center">
-                                <div class="text-2xl font-bold text-cyan-400">99.8%</div>
-                                <div class="text-[10px] text-gray-500">Uptime</div>
-                            </div>
-                        </div>
-                        <div class="space-y-2">
-                            <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-green-400"></div><span class="text-xs text-gray-400">Tower Alpha - 32 clients</span><span class="text-xs text-green-400 ml-auto">-62 dBm</span></div>
-                            <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-green-400"></div><span class="text-xs text-gray-400">Tower Bravo - 28 clients</span><span class="text-xs text-green-400 ml-auto">-58 dBm</span></div>
-                            <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-yellow-400"></div><span class="text-xs text-gray-400">Tower Charlie - 41 clients</span><span class="text-xs text-yellow-400 ml-auto">-74 dBm</span></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Features -->
-    <section id="features" class="section-divider py-24">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl font-bold mb-4"><span class="gradient-text">Built for ISPs & WISPs</span></h2>
-                <p class="text-gray-400 text-lg max-w-2xl mx-auto">Everything you need to manage your wireless network infrastructure in one platform.</p>
-            </div>
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div class="card rounded-2xl p-6">
-                    <div class="text-3xl mb-4">&#128225;</div>
-                    <h3 class="text-lg font-semibold mb-2 text-white">Tower Monitoring</h3>
-                    <p class="text-gray-400 text-sm">Real-time monitoring of all your tower equipment. Signal levels, client counts, uptime, and performance metrics at a glance.</p>
-                </div>
-                <div class="card rounded-2xl p-6">
-                    <div class="text-3xl mb-4">&#128187;</div>
-                    <h3 class="text-lg font-semibold mb-2 text-white">Device Management</h3>
-                    <p class="text-gray-400 text-sm">Manage MikroTik, Ubiquiti, Cambium, and Mimosa devices. Auto-discovery, firmware tracking, and configuration backups.</p>
-                </div>
-                <div class="card rounded-2xl p-6">
-                    <div class="text-3xl mb-4">&#128246;</div>
-                    <h3 class="text-lg font-semibold mb-2 text-white">Wireless Clients</h3>
-                    <p class="text-gray-400 text-sm">Track every connected client across all towers. Signal strength, SNR, CCQ, and data rates with automatic classification.</p>
-                </div>
-                <div class="card rounded-2xl p-6">
-                    <div class="text-3xl mb-4">&#128196;</div>
-                    <h3 class="text-lg font-semibold mb-2 text-white">Script Automation</h3>
-                    <p class="text-gray-400 text-sm">Push RouterOS scripts to devices individually or in bulk. Schedule recurring tasks for automated configuration management.</p>
-                </div>
-                <div class="card rounded-2xl p-6">
-                    <div class="text-3xl mb-4">&#128202;</div>
-                    <h3 class="text-lg font-semibold mb-2 text-white">Zabbix Integration</h3>
-                    <p class="text-gray-400 text-sm">Seamless integration with Zabbix for advanced monitoring, alerting, and historical data analysis.</p>
-                </div>
-                <div class="card rounded-2xl p-6">
-                    <div class="text-3xl mb-4">&#128274;</div>
-                    <h3 class="text-lg font-semibold mb-2 text-white">Multi-Tenancy</h3>
-                    <p class="text-gray-400 text-sm">Isolate data by company. Perfect for MSPs managing multiple client networks from a single Connexa instance.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Downloads -->
-    <section id="downloads" class="section-divider py-24 bg-gray-950/50">
-        <div class="max-w-5xl mx-auto px-6">
-            <div class="text-center mb-12">
-                <h2 class="text-4xl font-bold mb-4"><span class="gradient-text">Download Connexa</span></h2>
-                <p class="text-gray-400 text-lg">Version {CURRENT_VERSION} &mdash; Desktop application for Linux</p>
-            </div>
-            <div class="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto" id="download-cards">
-                <!-- DEB Package -->
-                <div class="download-card rounded-2xl p-8 text-center transition-all">
-                    <div class="text-5xl mb-4">&#128039;</div>
-                    <h3 class="text-xl font-semibold mb-2 text-white">Debian / Ubuntu</h3>
-                    <p class="text-gray-400 text-sm mb-1">connexa_{CURRENT_VERSION}_amd64.deb</p>
-                    <p class="text-gray-500 text-xs mb-6">Recommended for Ubuntu 22.04+</p>
-                    <a id="deb-download" href="/static/connexa_{CURRENT_VERSION}_amd64.deb" class="glow-btn inline-block py-3 px-8 rounded-xl text-white font-medium">
-                        &#11015; Download .deb
-                    </a>
-                    <p class="text-gray-600 text-xs mt-4">
-                        Install: <code class="bg-gray-800 px-2 py-0.5 rounded text-gray-400">sudo dpkg -i connexa_*.deb</code>
-                    </p>
-                </div>
-                <!-- Windows EXE -->
-                <div class="download-card rounded-2xl p-8 text-center transition-all">
-                    <div class="text-5xl mb-4">&#128187;</div>
-                    <h3 class="text-xl font-semibold mb-2 text-white">Windows</h3>
-                    <p class="text-gray-400 text-sm mb-1">Connexa-Setup-{CURRENT_VERSION}.exe</p>
-                    <p class="text-gray-500 text-xs mb-6">Windows 10 / 11 (64-bit)</p>
-                    <a id="exe-download" href="/static/Connexa-Setup-{CURRENT_VERSION}.exe" class="glow-btn inline-block py-3 px-8 rounded-xl text-white font-medium">
-                        &#11015; Download .exe
-                    </a>
-                    <p class="text-gray-600 text-xs mt-4">
-                        Run the installer and follow the setup wizard
-                    </p>
-                </div>
-            </div>
-            <div class="text-center mt-8 text-gray-500 text-sm">
-                <p>Need a license key? <a href="#contact" class="text-blue-400 hover:underline">Contact us</a> or email <a href="mailto:{SUPPORT_EMAIL}" class="text-blue-400 hover:underline">{SUPPORT_EMAIL}</a></p>
-            </div>
-        </div>
-    </section>
-
-    <!-- Pricing -->
-    <section id="pricing" class="section-divider py-24">
-        <div class="max-w-5xl mx-auto px-6">
-            <div class="text-center mb-12">
-                <h2 class="text-4xl font-bold mb-4"><span class="gradient-text">Simple Pricing</span></h2>
-                <p class="text-gray-400 text-lg">Choose the plan that fits your network</p>
-            </div>
-            <div class="grid md:grid-cols-3 gap-6">
-                <div class="card rounded-2xl p-8">
-                    <h3 class="text-lg font-semibold text-gray-400 mb-2">Trial</h3>
-                    <div class="text-4xl font-bold text-white mb-1">Free</div>
-                    <p class="text-gray-500 text-sm mb-6">7-day trial</p>
-                    <ul class="space-y-3 text-sm text-gray-400 mb-8">
-                        <li>&#10003; Up to 10 devices</li>
-                        <li>&#10003; All features included</li>
-                        <li>&#10003; Email support</li>
-                    </ul>
-                    <a href="#downloads" class="block text-center py-2.5 rounded-lg border border-gray-700 text-gray-300 hover:border-blue-500 transition text-sm font-medium">Start Free Trial</a>
-                </div>
-                <div class="card rounded-2xl p-8 border-blue-500/30 relative">
-                    <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full">Popular</div>
-                    <h3 class="text-lg font-semibold text-blue-400 mb-2">Professional</h3>
-                    <div class="text-4xl font-bold text-white mb-1">R500<span class="text-lg text-gray-500">/mo</span></div>
-                    <p class="text-gray-500 text-sm mb-6">Per installation</p>
-                    <ul class="space-y-3 text-sm text-gray-400 mb-8">
-                        <li>&#10003; Unlimited devices</li>
-                        <li>&#10003; All features included</li>
-                        <li>&#10003; Priority support</li>
-                        <li>&#10003; Zabbix integration</li>
-                    </ul>
-                    <a href="mailto:{SUPPORT_EMAIL}?subject=Connexa%20Professional%20License" class="glow-btn block text-center py-2.5 rounded-lg text-white text-sm font-medium">Get Started</a>
-                </div>
-                <div class="card rounded-2xl p-8">
-                    <h3 class="text-lg font-semibold text-gray-400 mb-2">Enterprise</h3>
-                    <div class="text-4xl font-bold text-white mb-1">Custom</div>
-                    <p class="text-gray-500 text-sm mb-6">Multi-tenant / MSP</p>
-                    <ul class="space-y-3 text-sm text-gray-400 mb-8">
-                        <li>&#10003; Multi-company support</li>
-                        <li>&#10003; Custom branding</li>
-                        <li>&#10003; Dedicated support</li>
-                        <li>&#10003; On-premise deployment</li>
-                    </ul>
-                    <a href="mailto:{SUPPORT_EMAIL}?subject=Connexa%20Enterprise%20Inquiry" class="block text-center py-2.5 rounded-lg border border-gray-700 text-gray-300 hover:border-blue-500 transition text-sm font-medium">Contact Sales</a>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Contact -->
-    <section id="contact" class="section-divider py-24 bg-gray-950/50">
-        <div class="max-w-3xl mx-auto px-6 text-center">
-            <h2 class="text-4xl font-bold mb-4"><span class="gradient-text">Get in Touch</span></h2>
-            <p class="text-gray-400 text-lg mb-8">Ready to streamline your network management? We're here to help.</p>
-            <div class="grid sm:grid-cols-2 gap-6 mb-12">
-                <div class="card rounded-2xl p-6">
-                    <div class="text-2xl mb-2">&#9993;</div>
-                    <h3 class="text-white font-medium mb-1">Email</h3>
-                    <a href="mailto:{SUPPORT_EMAIL}" class="text-blue-400 hover:underline text-sm">{SUPPORT_EMAIL}</a>
-                </div>
-                <div class="card rounded-2xl p-6">
-                    <div class="text-2xl mb-2">&#128222;</div>
-                    <h3 class="text-white font-medium mb-1">Support</h3>
-                    <p class="text-gray-400 text-sm">Response within 24 hours</p>
-                </div>
-            </div>
-            <div class="text-gray-600 text-sm">
-                <p>&copy; {datetime.now().year} Connexify (Pty) Ltd &mdash; South Africa</p>
-                <p class="mt-1">All rights reserved.</p>
-            </div>
-        </div>
-    </section>
-</body>
-</html>"""
+WEBSITE_HTML = _render_template(WEBSITE_TEMPLATE)
+GET_STARTED_HTML = _render_template(GET_STARTED_TEMPLATE)
+DOCS_HTML = _render_template(DOCS_TEMPLATE)
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -466,13 +218,53 @@ async def homepage():
     return HTMLResponse(content=WEBSITE_HTML)
 
 
+@app.get("/get-started", response_class=HTMLResponse)
+async def get_started_page():
+    """Step-by-step get started wizard"""
+    return HTMLResponse(content=GET_STARTED_HTML)
+
+
+@app.get("/docs", response_class=HTMLResponse)
+async def docs_page():
+    """Client-friendly documentation"""
+    return HTMLResponse(content=DOCS_HTML)
+
+
+class ContactFormRequest(BaseModel):
+    name: str
+    email: str
+    company: str = ""
+    subject: str = "General Inquiry"
+    message: str
+
+
+@app.post("/api/contact")
+async def submit_contact_form(request: ContactFormRequest):
+    """Handle contact form submissions"""
+    if SMTP_USER and SMTP_PASS:
+        try:
+            msg = MIMEMultipart()
+            msg['Subject'] = f'Connexify Contact: {request.subject}'
+            msg['From'] = f'{FROM_NAME} <{FROM_EMAIL}>'
+            msg['To'] = SUPPORT_EMAIL
+            msg['Reply-To'] = request.email
+            body = f"Name: {request.name}\nEmail: {request.email}\nCompany: {request.company}\nSubject: {request.subject}\n\nMessage:\n{request.message}"
+            msg.attach(MIMEText(body, 'plain'))
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASS)
+                server.sendmail(FROM_EMAIL, SUPPORT_EMAIL, msg.as_string())
+        except Exception as e:
+            print(f"Contact form email error: {e}")
+    return {"success": True, "message": "Thank you! We'll get back to you within 24 hours."}
+
+
 @app.get("/health")
 async def health_check():
     return {"service": "Connexa License Server", "status": "running", "version": "1.0.0", "licenses": len(LICENSE_DATABASE)}
 
 
 # Serve static files for downloads (DEB / EXE)
-# Place installer files in render-license-server/static/
 STATIC_DIR = Path(__file__).parent / "static"
 STATIC_DIR.mkdir(exist_ok=True)
 
