@@ -1,14 +1,8 @@
-"""
-Connexify Customer Portal Template
-Self-contained dashboard — no external auth dependency.
-Uses session tokens + FastAPI backend for data.
-"""
-
-PORTAL_TEMPLATE = """<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My Account - __COMPANY__</title>
+<title>My Account - Connexify</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -28,21 +22,21 @@ input:focus{border-color:#3b82f6!important}
 </head>
 <body class="min-h-screen text-gray-300">
 
-<!-- Loading (hidden by default - only shown when checking existing session) -->
-<div id="loading" class="min-h-screen flex items-center justify-center" style="display:none">
+<!-- Loading -->
+<div id="loading" class="min-h-screen flex items-center justify-center">
 <div class="text-center">
 <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-<p class="text-gray-500 text-sm">Checking session...</p>
+<p class="text-gray-500 text-sm">Loading portal...</p>
 </div></div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
-<!--   AUTH VIEW (visible by default — login form shows immediately) -->
+<!--   AUTH VIEW                                                -->
 <!-- ═══════════════════════════════════════════════════════════ -->
-<div id="auth-view" class="min-h-screen flex items-center justify-center p-4">
+<div id="auth-view" class="hidden min-h-screen flex items-center justify-center p-4">
 <div class="w-full max-w-md">
 <!-- Logo -->
 <div class="text-center mb-8">
-<a href="/" class="inline-block no-underline"><h1 class="text-2xl font-bold grad-text">__COMPANY__</h1></a>
+<a href="/" class="inline-block no-underline"><h1 class="text-2xl font-bold grad-text">Connexify</h1></a>
 <p class="text-gray-500 text-sm mt-1">Customer Portal</p>
 </div>
 
@@ -119,12 +113,12 @@ Already have an account? <a onclick="showAuthView('login')" class="text-blue-400
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!--   DASHBOARD VIEW                                           -->
 <!-- ═══════════════════════════════════════════════════════════ -->
-<div id="dashboard-view" class="min-h-screen" style="display:none">
+<div id="dashboard-view" class="hidden min-h-screen">
 
 <!-- Top Nav -->
 <nav class="border-b border-gray-800/50 bg-gray-950/80 backdrop-blur sticky top-0 z-50">
 <div class="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
-<a href="/" class="font-bold grad-text text-lg no-underline">__COMPANY__</a>
+<a href="/" class="font-bold grad-text text-lg no-underline">Connexify</a>
 <div class="flex items-center gap-4">
 <span id="nav-user-name" class="text-gray-400 text-sm hidden sm:block"></span>
 <button onclick="doLogout()" class="text-gray-500 hover:text-red-400 text-sm transition">Sign Out</button>
@@ -141,7 +135,7 @@ Already have an account? <a onclick="showAuthView('login')" class="text-blue-400
 </nav>
 <div class="mt-8 pt-4 border-t border-gray-800/50">
 <a href="/#downloads" class="sidebar-link text-gray-500 no-underline">&#11015; Download App</a>
-<a href="mailto:__EMAIL__" class="sidebar-link text-gray-500 no-underline">&#128172; Support</a>
+<a href="mailto:admin@connexify.co.za" class="sidebar-link text-gray-500 no-underline">&#128172; Support</a>
 </div></aside>
 
 <!-- Mobile Tabs -->
@@ -333,18 +327,16 @@ function showToast(msg,type){
 // ═══ Auth UI ═══
 
 function showAuthView(form){
-  document.getElementById('loading').style.display='none';
-  document.getElementById('dashboard-view').style.display='none';
-  document.getElementById('auth-view').style.display='';
-  ['login-form','register-form','forgot-form','reset-form'].forEach(f=>{
-    const el=document.getElementById(f);
-    if(el)el.style.display=(f===form+'-form')?'':'none';
-  });
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('dashboard-view').classList.add('hidden');
+  document.getElementById('auth-view').classList.remove('hidden');
+  ['login-form','register-form','forgot-form','reset-form'].forEach(f=>
+    document.getElementById(f).classList[f===form+'-form'?'remove':'add']('hidden'));
 }
 function showDashboard(){
-  document.getElementById('loading').style.display='none';
-  document.getElementById('auth-view').style.display='none';
-  document.getElementById('dashboard-view').style.display='';
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('auth-view').classList.add('hidden');
+  document.getElementById('dashboard-view').classList.remove('hidden');
 }
 
 // ═══ Auth Actions ═══
@@ -475,7 +467,7 @@ async function loadLicenses(){
       +'<span class="px-2 py-0.5 rounded text-xs font-medium '+typeCls+'">'+l.license_type+'</span>'
       +'<span class="ml-2 px-2 py-0.5 rounded text-xs font-medium '+statusCls+'">'+l.status+'</span>'
       +'</div><p class="text-gray-500 text-xs">'+creDate+'</p></div>'
-      +'<p class="license-key font-mono text-cyan-400 text-sm mb-3" onclick="this.classList.toggle(\'revealed\')" title="Click to reveal">'+l.license_key+'</p>'
+      +'<p class="license-key font-mono text-cyan-400 text-sm mb-3" onclick="this.classList.toggle('revealed')" title="Click to reveal">'+l.license_key+'</p>'
       +'<div class="grid grid-cols-2 gap-2 text-xs"><div><p class="text-gray-500">Hardware</p><p class="text-white">'+hw+'</p></div>'
       +'<div><p class="text-gray-500">Expires</p><p class="text-white">'+expDate+'</p></div></div></div>';
   }).join('');
@@ -551,7 +543,7 @@ function updateSubTotal(){
   const p=subBilling==='annual'?PRICE_ANNUAL:PRICE_MONTHLY;const t=p*subQty;
   const period=subBilling==='annual'?'year':'month';
   document.getElementById('sub-total').textContent='R'+t.toLocaleString();
-  document.getElementById('sub-breakdown').textContent='R'+p.toLocaleString()+' \\u00d7 '+subQty+' license(s) \\u00d7 1 '+period;
+  document.getElementById('sub-breakdown').textContent='R'+p.toLocaleString()+' \u00d7 '+subQty+' license(s) \u00d7 1 '+period;
 }
 async function subscribePay(){
   const data=await api('POST','/api/portal/subscribe',{billing_cycle:subBilling,quantity:subQty});
@@ -585,42 +577,28 @@ function switchTab(tab){
   }
   // Check for payment return
   if(params.get('payment')==='success'){
-    if(authToken){
-      document.getElementById('auth-view').style.display='none';
-      document.getElementById('loading').style.display='';
-      await loadDashboard();
-      setTimeout(()=>showToast('Payment successful! Your license will appear shortly.','success'),500);
-    }
+    if(authToken){await loadDashboard();setTimeout(()=>showToast('Payment successful! Your license will appear shortly.','success'),500)}
+    else showAuthView('login');
     window.history.replaceState({},document.title,'/portal');
     return;
   }
   if(params.get('payment')==='cancelled'){
-    if(authToken){
-      document.getElementById('auth-view').style.display='none';
-      document.getElementById('loading').style.display='';
-      await loadDashboard();
-      setTimeout(()=>showToast('Payment was cancelled.','error'),500);
-    }
+    if(authToken){await loadDashboard();setTimeout(()=>showToast('Payment was cancelled.','error'),500)}
+    else showAuthView('login');
     window.history.replaceState({},document.title,'/portal');
     return;
   }
-  // If user has a saved session token, check it
+  // Check existing session
   if(authToken){
-    // Show loading spinner while we verify the session
-    document.getElementById('auth-view').style.display='none';
-    document.getElementById('loading').style.display='';
-    try{
-      const data=await api('GET','/api/portal/me');
-      if(data&&data.customer){await loadDashboard()}
-      else{authToken=null;localStorage.removeItem('portal_token');showAuthView('login')}
-    }catch(e){
-      authToken=null;localStorage.removeItem('portal_token');showAuthView('login');
-    }
+    const data=await api('GET','/api/portal/me');
+    if(data&&data.customer){await loadDashboard()}
+    else{authToken=null;localStorage.removeItem('portal_token');showAuthView('login')}
+  }else{
+    showAuthView('login');
   }
-  // If no token, auth-view (login form) is already visible by default — nothing to do
 })();
 
 setSubBilling('monthly');
 </script>
 </body>
-</html>"""
+</html>
