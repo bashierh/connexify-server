@@ -62,19 +62,87 @@ PAYFAST_PASSPHRASE = os.getenv("PAYFAST_PASSPHRASE", "159951Bashier")
 PAYFAST_URL = os.getenv("PAYFAST_URL", "https://www.payfast.co.za/eng/process")
 SITE_URL = os.getenv("SITE_URL", "https://www.connexify.co.za")
 
-# ── Supabase configuration ──
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+# ══════════════════════════════════════════════════════════════════
+#   PORTAL USER DATABASE (self-contained, no Supabase needed)
+# ══════════════════════════════════════════════════════════════════
+PORTAL_USERS_FILE = os.path.join(DATA_DIR, "portal_users.json")
+PORTAL_USERS = {}  # email -> {email, full_name, company, phone, password_hash, salt, created_at, is_suspended}
+PORTAL_SESSIONS = {}  # token -> email
+PORTAL_RESET_TOKENS = {}  # reset_token -> {email, expires}
 
-supabase_client = None
-if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+def _hash_password(password: str, salt: str = None) -> tuple:
+    """Hash password with salt. Returns (hash, salt)."""
+    if not salt:
+        salt = secrets.token_hex(16)
+    pw_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+    return pw_hash, salt
+
+def load_portal_users():
+    global PORTAL_USERS
+    if os.path.exists(PORTAL_USERS_FILE):
+        try:
+            with open(PORTAL_USERS_FILE, 'r') as f:
+                PORTAL_USERS = json.load(f)
+            print(f"[Portal] Loaded {len(PORTAL_USERS)} portal users")
+        except Exception as e:
+            print(f"[Portal] Error loading users: {e}")
+
+def save_portal_users():
     try:
-        from supabase import create_client
-        supabase_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-        print(f"[Supabase] Connected to {SUPABASE_URL}")
+        with open(PORTAL_USERS_FILE, 'w') as f:
+            json.dump(PORTAL_USERS, f, indent=2)
     except Exception as e:
-        print(f"[Supabase] Init error: {e}")
+        print(f"[Portal] Error saving users: {e}")
+
+def create_portal_user(email: str, password: str, full_name: str = "", company: str = "") -> dict:
+    """Create a new portal user. Returns user dict."""
+    email = email.lower().strip()
+    pw_hash, salt = _hash_password(password)
+    user = {
+        "email": email,
+        "full_name": full_name,
+        "company": company,
+        "phone": "",
+        "password_hash": pw_hash,
+        "salt": salt,
+        "created_at": datetime.now().isoformat(),
+        "is_suspended": False,
+    }
+    PORTAL_USERS[email] = user
+    save_portal_users()
+    print(f"[Portal] User created: {email}")
+    return user
+
+def verify_portal_login(email: str, password: str) -> dict | None:
+    """Verify credentials. Returns user dict or None."""
+    email = email.lower().strip()
+    user = PORTAL_USERS.get(email)
+    if not user:
+        return None
+    pw_hash, _ = _hash_password(password, user["salt"])
+    if pw_hash != user["password_hash"]:
+        return None
+    return user
+
+def create_session(email: str) -> str:
+    """Create a session token for a user."""
+    token = secrets.token_hex(32)
+    PORTAL_SESSIONS[token] = email.lower().strip()
+    return token
+
+def get_session_user(token: str) -> dict | None:
+    """Get user from session token."""
+    email = PORTAL_SESSIONS.get(token)
+    if not email:
+        return None
+    user = PORTAL_USERS.get(email)
+    if not user:
+        return None
+    if user.get("is_suspended"):
+        return None
+    return user
+
+load_portal_users()
 
 # In-memory database
 LICENSE_DATABASE = {}
@@ -285,9 +353,7 @@ def _render_template(template: str) -> str:
         .replace("__VERSION__", CURRENT_VERSION)
         .replace("__EMAIL__", SUPPORT_EMAIL)
         .replace("__YEAR__", str(datetime.now().year))
-        .replace("__COMPANY__", COMPANY_NAME)
-        .replace("__SUPABASE_URL__", SUPABASE_URL)
-        .replace("__SUPABASE_ANON_KEY__", SUPABASE_ANON_KEY))
+        .replace("__COMPANY__", COMPANY_NAME))
 
 WEBSITE_HTML = _render_template(WEBSITE_TEMPLATE)
 GET_STARTED_HTML = _render_template(GET_STARTED_TEMPLATE)
@@ -431,21 +497,12 @@ async def activate_trial(request: TrialRequest):
                 except Exception as e:
                     print(f"[Trial] Email re-send error: {e}")
             # Create portal account if password provided and account doesn't exist yet
-            if supabase_client and request.password and len(request.password) >= 6:
+            if request.password and len(request.password) >= 6 and email not in PORTAL_USERS:
                 try:
-                    existing_auth = supabase_client.table("portal_customers").select("auth_id").eq("email", email).execute()
-                    if not existing_auth.data or not existing_auth.data[0].get("auth_id"):
-                        auth_response = supabase_client.auth.admin.create_user({
-                            "email": email,
-                            "password": request.password,
-                            "email_confirm": True,
-                            "user_metadata": {"full_name": request.name, "company": request.company}
-                        })
-                        if auth_response and auth_response.user:
-                            supabase_client.table("portal_customers").update({"auth_id": str(auth_response.user.id)}).eq("email", email).execute()
-                            print(f"[Trial] Portal account created on re-send for {email}")
+                    create_portal_user(email, request.password, request.name, request.company)
+                    print(f"[Trial] Portal account created on re-send for {email}")
                 except Exception as e:
-                    print(f"[Trial] Auth create on re-send error: {e}")
+                    print(f"[Trial] Portal account create error: {e}")
             return {"success": True, "message": "Trial license re-sent to your email.", "existing": True}
 
     # Generate new 7-day trial license
@@ -473,28 +530,13 @@ async def activate_trial(request: TrialRequest):
     save_database()
     print(f"[Trial] 7-day trial license created for {email}: {license_key}")
 
-    # Sync to Supabase portal
-    sync_license_to_supabase(email, request.name, request.company, license_key, 'trial', 7, expires.isoformat())
-
-    # Create Supabase auth account if password provided
-    if supabase_client and request.password and len(request.password) >= 6:
+    # Create portal account if password provided
+    if request.password and len(request.password) >= 6 and email not in PORTAL_USERS:
         try:
-            auth_response = supabase_client.auth.admin.create_user({
-                "email": email,
-                "password": request.password,
-                "email_confirm": True,
-                "user_metadata": {
-                    "full_name": request.name,
-                    "company": request.company
-                }
-            })
-            # Link auth_id to customer record
-            if auth_response and auth_response.user:
-                auth_id = str(auth_response.user.id)
-                supabase_client.table("portal_customers").update({"auth_id": auth_id}).eq("email", email).execute()
-                print(f"[Trial] Portal account created for {email}")
+            create_portal_user(email, request.password, request.name, request.company)
+            print(f"[Trial] Portal account created for {email}")
         except Exception as e:
-            print(f"[Trial] Supabase auth create error (may already exist): {e}")
+            print(f"[Trial] Portal account error: {e}")
 
     # Send trial welcome email
     if SMTP_USER:
@@ -633,29 +675,13 @@ async def payfast_notify(request: Request):
         save_database()
         print(f"[PayFast ITN] {qty} license(s) created for {customer_email}: {license_keys}")
 
-        # Sync each license to Supabase portal
-        lic_type = "annual" if is_annual else "monthly"
-        for lk in license_keys:
-            exp_iso = (datetime.now() + timedelta(days=duration_days)).isoformat()
-            sync_license_to_supabase(customer_email, f"{name_first} {name_last}".strip(), company,
-                                      lk, lic_type, duration_days, exp_iso)
-
-        # Create payment record in Supabase
-        if supabase_client:
-            try:
-                cust = supabase_client.table("portal_customers").select("id").eq("email", customer_email.lower()).execute()
-                if cust.data:
-                    supabase_client.table("portal_payments").insert({
-                        "customer_id": cust.data[0]["id"],
-                        "amount_rands": float(amount_gross),
-                        "payment_method": "payfast",
-                        "payment_reference": m_payment_id,
-                        "payfast_payment_id": pf_payment_id,
-                        "status": "complete",
-                        "description": f"{qty}x Professional ({cycle_label})",
-                    }).execute()
-            except Exception as e:
-                print(f"[Supabase] Payment record error: {e}")
+        # Create portal user account if doesn't exist
+        email_lower = customer_email.lower()
+        if email_lower and email_lower not in PORTAL_USERS:
+            # Create account with a temporary random password (user can reset via portal)
+            temp_pw = secrets.token_hex(8)
+            create_portal_user(email_lower, temp_pw, f"{name_first} {name_last}".strip(), company)
+            print(f"[PayFast ITN] Portal account auto-created for {email_lower} (temp password)")
 
         # Send license email with all keys
         if SMTP_USER and customer_email:
@@ -674,91 +700,144 @@ async def payfast_notify(request: Request):
 
 
 # ══════════════════════════════════════════════════════════════════
-#   SUPABASE SYNC HELPERS
+#   ROUTES - Portal Auth API (self-contained, no Supabase)
 # ══════════════════════════════════════════════════════════════════
 
-async def get_portal_user(request: Request):
-    """Validate portal user from Supabase JWT and return/create customer record."""
-    if not supabase_client:
-        raise HTTPException(503, "Portal not configured")
+@app.post("/api/portal/auth/login")
+async def portal_auth_login(request: Request):
+    """Login with email/password, return session token."""
+    body = await request.json()
+    email = (body.get("email") or "").strip().lower()
+    password = body.get("password") or ""
+    if not email or not password:
+        raise HTTPException(400, "Email and password required")
+    user = verify_portal_login(email, password)
+    if not user:
+        raise HTTPException(401, "Invalid email or password")
+    if user.get("is_suspended"):
+        raise HTTPException(403, "Account suspended. Contact support.")
+    token = create_session(email)
+    return {"token": token, "user": {"email": user["email"], "full_name": user["full_name"], "company": user.get("company", "")}}
+
+
+@app.post("/api/portal/auth/register")
+async def portal_auth_register(request: Request):
+    """Register a new portal account."""
+    body = await request.json()
+    email = (body.get("email") or "").strip().lower()
+    password = body.get("password") or ""
+    full_name = (body.get("full_name") or "").strip()
+    company = (body.get("company") or "").strip()
+    if not email or not password:
+        raise HTTPException(400, "Email and password required")
+    if len(password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
+    if email in PORTAL_USERS:
+        raise HTTPException(409, "An account with this email already exists. Please sign in.")
+    user = create_portal_user(email, password, full_name, company)
+    token = create_session(email)
+    return {"token": token, "user": {"email": user["email"], "full_name": user["full_name"], "company": user.get("company", "")}}
+
+
+@app.post("/api/portal/auth/forgot-password")
+async def portal_auth_forgot(request: Request):
+    """Send a password reset email."""
+    body = await request.json()
+    email = (body.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(400, "Email required")
+    # Always return success (don't reveal if email exists)
+    if email in PORTAL_USERS and SMTP_USER and SMTP_PASS:
+        reset_token = secrets.token_urlsafe(32)
+        PORTAL_RESET_TOKENS[reset_token] = {"email": email, "expires": (datetime.now() + timedelta(hours=1)).isoformat()}
+        reset_url = f"{SITE_URL}/portal?reset_token={reset_token}"
+        try:
+            html = f"""
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#0f172a;color:#e2e8f0;padding:40px;border-radius:12px;">
+                <h1 style="color:#3b82f6;text-align:center;">Password Reset</h1>
+                <p style="text-align:center;color:#94a3b8;">Click the link below to reset your password.</p>
+                <div style="text-align:center;margin:30px 0;">
+                    <a href="{reset_url}" style="background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:bold;">Reset Password</a>
+                </div>
+                <p style="font-size:12px;color:#64748b;text-align:center;">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
+                <hr style="border:none;border-top:1px solid #334155;margin:24px 0;">
+                <p style="font-size:12px;color:#64748b;text-align:center;">&copy; {datetime.now().year} {COMPANY_NAME}</p>
+            </div>"""
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = f'{COMPANY_NAME} - Password Reset'
+            msg['From'] = f'{FROM_NAME} <{FROM_EMAIL}>'
+            msg['To'] = email
+            msg.attach(MIMEText(html, 'html'))
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASS)
+                server.sendmail(FROM_EMAIL, email, msg.as_string())
+            print(f"[Portal] Password reset email sent to {email}")
+        except Exception as e:
+            print(f"[Portal] Reset email error: {e}")
+    return {"success": True, "message": "If that email has an account, a reset link has been sent."}
+
+
+@app.post("/api/portal/auth/reset-password")
+async def portal_auth_reset(request: Request):
+    """Reset password using a reset token."""
+    body = await request.json()
+    token = body.get("reset_token") or ""
+    new_password = body.get("password") or ""
+    if not token or not new_password:
+        raise HTTPException(400, "Reset token and new password required")
+    if len(new_password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
+    reset_info = PORTAL_RESET_TOKENS.get(token)
+    if not reset_info:
+        raise HTTPException(400, "Invalid or expired reset link")
+    if datetime.fromisoformat(reset_info["expires"]) < datetime.now():
+        del PORTAL_RESET_TOKENS[token]
+        raise HTTPException(400, "Reset link has expired. Please request a new one.")
+    email = reset_info["email"]
+    user = PORTAL_USERS.get(email)
+    if not user:
+        raise HTTPException(400, "Account not found")
+    pw_hash, salt = _hash_password(new_password)
+    user["password_hash"] = pw_hash
+    user["salt"] = salt
+    PORTAL_USERS[email] = user
+    save_portal_users()
+    del PORTAL_RESET_TOKENS[token]
+    session_token = create_session(email)
+    return {"success": True, "token": session_token, "message": "Password updated successfully!"}
+
+
+@app.post("/api/portal/auth/change-password")
+async def portal_auth_change_password(request: Request):
+    """Change password for authenticated user."""
+    user = await _get_portal_user(request)
+    body = await request.json()
+    new_password = body.get("password") or ""
+    if len(new_password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
+    email = user["email"]
+    portal_user = PORTAL_USERS.get(email)
+    if not portal_user:
+        raise HTTPException(400, "Account not found")
+    pw_hash, salt = _hash_password(new_password)
+    portal_user["password_hash"] = pw_hash
+    portal_user["salt"] = salt
+    PORTAL_USERS[email] = portal_user
+    save_portal_users()
+    return {"success": True, "message": "Password updated successfully!"}
+
+
+async def _get_portal_user(request: Request) -> dict:
+    """Get authenticated portal user from session token."""
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         raise HTTPException(401, "Not authenticated")
     token = auth_header.split(" ")[1]
-    try:
-        user_response = supabase_client.auth.get_user(token)
-        auth_user = user_response.user
-    except Exception:
-        raise HTTPException(401, "Invalid or expired token")
-
-    auth_id = str(auth_user.id)
-    # Look up by auth_id first
-    result = supabase_client.table("portal_customers").select("*").eq("auth_id", auth_id).execute()
-    if result.data:
-        customer = result.data[0]
-        if customer.get('is_suspended'):
-            raise HTTPException(403, "Account suspended. Contact support.")
-        return customer
-    # Look up by email (customer may have been created before portal registration)
-    result = supabase_client.table("portal_customers").select("*").eq("email", auth_user.email).execute()
-    if result.data:
-        customer = result.data[0]
-        supabase_client.table("portal_customers").update({"auth_id": auth_id}).eq("id", customer["id"]).execute()
-        if customer.get('is_suspended'):
-            raise HTTPException(403, "Account suspended. Contact support.")
-        return customer
-    # Create new customer
-    meta = auth_user.user_metadata or {}
-    new_cust = {
-        "auth_id": auth_id,
-        "email": auth_user.email,
-        "full_name": meta.get("full_name", ""),
-        "company": meta.get("company", ""),
-    }
-    result = supabase_client.table("portal_customers").insert(new_cust).execute()
-    return result.data[0]
-
-
-def sync_license_to_supabase(email: str, name: str, company: str, license_key: str,
-                              license_type: str, duration_days: int, expires_iso: str):
-    """Create/update customer and license records in Supabase portal tables."""
-    if not supabase_client:
-        return
-    try:
-        email_lower = email.lower()
-        result = supabase_client.table("portal_customers").select("id").eq("email", email_lower).execute()
-        if result.data:
-            customer_id = result.data[0]["id"]
-        else:
-            ins = supabase_client.table("portal_customers").insert({
-                "email": email_lower, "full_name": name, "company": company
-            }).execute()
-            customer_id = ins.data[0]["id"]
-
-        supabase_client.table("portal_licenses").insert({
-            "customer_id": customer_id,
-            "license_key": license_key,
-            "license_type": license_type,
-            "status": "active",
-            "duration_days": duration_days,
-            "expires_at": expires_iso,
-        }).execute()
-
-        billing_cycle = license_type
-        plan = "trial" if license_type == "trial" else "professional"
-        amount = 0 if license_type == "trial" else (6800 if license_type == "annual" else 600)
-        supabase_client.table("portal_subscriptions").insert({
-            "customer_id": customer_id,
-            "plan": plan,
-            "billing_cycle": billing_cycle,
-            "status": "active",
-            "amount_rands": amount,
-            "current_period_end": expires_iso,
-        }).execute()
-
-        print(f"[Supabase] Synced license {license_key} for {email_lower}")
-    except Exception as e:
-        print(f"[Supabase] Sync error: {e}")
+    user = get_session_user(token)
+    if not user:
+        raise HTTPException(401, "Session expired. Please sign in again.")
+    return user
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -768,15 +847,26 @@ def sync_license_to_supabase(email: str, name: str, company: str, license_key: s
 @app.get("/api/portal/me")
 async def portal_me(request: Request):
     """Get current user profile and stats."""
-    customer = await get_portal_user(request)
-    cid = customer["id"]
-    licenses = supabase_client.table("portal_licenses").select("id").eq("customer_id", cid).execute()
-    subs = supabase_client.table("portal_subscriptions").select("plan,status").eq("customer_id", cid).order("created_at", desc=True).limit(1).execute()
-    current_plan = subs.data[0]["plan"].capitalize() if subs.data else None
+    user = await _get_portal_user(request)
+    email = user["email"]
+    # Count licenses from JSON DB
+    my_licenses = [lic for lic in LICENSE_DATABASE.values() if lic.get('customer_email', '').lower() == email]
+    active_licenses = [lic for lic in my_licenses if lic.get('active')]
+    has_trial = any(lic.get('is_demo') for lic in my_licenses)
+    has_paid = any(not lic.get('is_demo') for lic in my_licenses)
+    current_plan = "Trial" if has_trial and not has_paid else "Professional" if has_paid else None
     return {
-        "customer": customer,
+        "customer": {
+            "email": user["email"],
+            "full_name": user.get("full_name", ""),
+            "company": user.get("company", ""),
+            "phone": user.get("phone", ""),
+            "created_at": user.get("created_at", ""),
+            "is_suspended": user.get("is_suspended", False),
+        },
         "stats": {
-            "total_licenses": len(licenses.data) if licenses.data else 0,
+            "total_licenses": len(my_licenses),
+            "active_licenses": len(active_licenses),
             "current_plan": current_plan,
         }
     }
@@ -785,77 +875,82 @@ async def portal_me(request: Request):
 @app.put("/api/portal/profile")
 async def portal_update_profile(request: Request):
     """Update customer profile (name, company, phone)."""
-    customer = await get_portal_user(request)
+    user = await _get_portal_user(request)
     body = await request.json()
-    update = {}
-    if "full_name" in body: update["full_name"] = body["full_name"]
-    if "company" in body: update["company"] = body["company"]
-    if "phone" in body: update["phone"] = body["phone"]
-    if update:
-        supabase_client.table("portal_customers").update(update).eq("id", customer["id"]).execute()
+    if "full_name" in body: user["full_name"] = body["full_name"]
+    if "company" in body: user["company"] = body["company"]
+    if "phone" in body: user["phone"] = body["phone"]
+    PORTAL_USERS[user["email"]] = user
+    save_portal_users()
     return {"success": True}
 
 
 @app.get("/api/portal/licenses")
 async def portal_licenses(request: Request):
-    """List customer's licenses."""
-    customer = await get_portal_user(request)
-    result = supabase_client.table("portal_licenses").select("*").eq("customer_id", customer["id"]).order("created_at", desc=True).execute()
-    # Sync hardware_id from JSON DB
-    for lic in (result.data or []):
-        key = lic.get("license_key", "")
-        if key in LICENSE_DATABASE:
-            json_lic = LICENSE_DATABASE[key]
-            if json_lic.get("hardware_id") and not lic.get("hardware_id"):
-                supabase_client.table("portal_licenses").update({"hardware_id": json_lic["hardware_id"]}).eq("id", lic["id"]).execute()
-                lic["hardware_id"] = json_lic["hardware_id"]
-    return {"licenses": result.data or []}
+    """List customer's licenses from JSON database."""
+    user = await _get_portal_user(request)
+    email = user["email"]
+    licenses = []
+    for key, lic in LICENSE_DATABASE.items():
+        if lic.get('customer_email', '').lower() == email:
+            expires = lic.get('expires', '')
+            is_expired = False
+            try:
+                is_expired = datetime.fromisoformat(expires) < datetime.now()
+            except Exception:
+                pass
+            licenses.append({
+                "license_key": key,
+                "license_type": "trial" if lic.get('is_demo') else ("annual" if lic.get('duration_days', 0) >= 365 else "monthly"),
+                "status": "expired" if is_expired else ("active" if lic.get('active') else "inactive"),
+                "hardware_id": lic.get('hardware_id'),
+                "duration_days": lic.get('duration_days', 0),
+                "expires_at": expires,
+                "created_at": lic.get('created_at', ''),
+            })
+    licenses.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    return {"licenses": licenses}
 
 
 @app.post("/api/portal/link-license")
 async def portal_link_license(request: Request):
     """Link an existing license key to this customer's portal account."""
-    customer = await get_portal_user(request)
+    user = await _get_portal_user(request)
     body = await request.json()
-    key = body.get("license_key", "").strip().upper()
+    key = (body.get("license_key") or "").strip().upper()
     if key not in LICENSE_DATABASE:
         raise HTTPException(404, "License key not found")
     lic = LICENSE_DATABASE[key]
-    existing = supabase_client.table("portal_licenses").select("id").eq("license_key", key).execute()
-    if existing.data:
-        raise HTTPException(400, "License already linked to an account")
-    if lic.get("customer_email", "").lower() != customer["email"].lower():
+    if lic.get("customer_email", "").lower() != user["email"]:
         raise HTTPException(403, "This license belongs to a different email address")
-    portal_lic = {
-        "customer_id": customer["id"],
-        "license_key": key,
-        "license_type": "trial" if lic.get("is_demo") else ("annual" if lic.get("duration_days", 0) >= 365 else "monthly"),
-        "status": "active" if lic.get("active") else "expired",
-        "hardware_id": lic.get("hardware_id"),
-        "duration_days": lic.get("duration_days", 7),
-        "expires_at": lic.get("expires", ""),
-    }
-    supabase_client.table("portal_licenses").insert(portal_lic).execute()
-    return {"success": True, "message": "License linked to your account"}
+    return {"success": True, "message": "License is already linked to your account"}
 
 
 @app.get("/api/portal/subscription")
 async def portal_subscription(request: Request):
-    """Get current subscription and payment history."""
-    customer = await get_portal_user(request)
-    cid = customer["id"]
-    subs = supabase_client.table("portal_subscriptions").select("*").eq("customer_id", cid).order("created_at", desc=True).limit(1).execute()
-    payments = supabase_client.table("portal_payments").select("*").eq("customer_id", cid).order("created_at", desc=True).limit(20).execute()
-    return {
-        "subscription": subs.data[0] if subs.data else None,
-        "payments": payments.data or []
-    }
+    """Get current subscription info from license database."""
+    user = await _get_portal_user(request)
+    email = user["email"]
+    my_licenses = [lic for lic in LICENSE_DATABASE.values() if lic.get('customer_email', '').lower() == email]
+    # Get the latest license as the "subscription"
+    subscription = None
+    if my_licenses:
+        latest = sorted(my_licenses, key=lambda x: x.get('created_at', ''), reverse=True)[0]
+        is_trial = latest.get('is_demo', False)
+        is_annual = latest.get('duration_days', 0) >= 365
+        subscription = {
+            "plan": "trial" if is_trial else "professional",
+            "billing_cycle": "trial" if is_trial else ("annual" if is_annual else "monthly"),
+            "status": "active" if latest.get('active') else "expired",
+            "current_period_end": latest.get('expires', ''),
+        }
+    return {"subscription": subscription, "payments": []}
 
 
 @app.post("/api/portal/subscribe")
 async def portal_subscribe(request: Request):
     """Create PayFast checkout for subscription from the customer portal."""
-    customer = await get_portal_user(request)
+    user = await _get_portal_user(request)
     body = await request.json()
     cycle = body.get("billing_cycle", "monthly")
     if cycle not in ("monthly", "annual"): cycle = "monthly"
@@ -866,7 +961,7 @@ async def portal_subscribe(request: Request):
     cycle_label = "1 Year" if cycle == "annual" else "1 Month"
     item_name = f"Connexa Professional License x{qty} ({cycle_label})"
     item_desc = f"{qty} license(s), {cycle_label}, via Customer Portal"
-    name_parts = (customer.get("full_name") or "").split()
+    name_parts = (user.get("full_name") or "").split()
     data = {
         "merchant_id": PAYFAST_MERCHANT_ID,
         "merchant_key": PAYFAST_MERCHANT_KEY,
@@ -875,15 +970,14 @@ async def portal_subscribe(request: Request):
         "notify_url": f"{SITE_URL}/api/payfast/notify",
         "name_first": name_parts[0] if name_parts else "",
         "name_last": " ".join(name_parts[1:]) if len(name_parts) > 1 else "",
-        "email_address": customer["email"],
+        "email_address": user["email"],
         "m_payment_id": payment_id,
         "amount": f"{total:.2f}",
         "item_name": item_name[:100],
         "item_description": item_desc[:255],
-        "custom_str1": customer["email"],
-        "custom_str2": customer.get("company", ""),
+        "custom_str1": user["email"],
+        "custom_str2": user.get("company", ""),
         "custom_str3": "professional",
-        "custom_str4": customer["id"],
         "custom_int1": str(qty),
         "custom_int2": str(1 if cycle == "annual" else 0),
     }
@@ -894,60 +988,37 @@ async def portal_subscribe(request: Request):
 
 @app.post("/api/portal/activate-trial")
 async def portal_activate_trial(request: Request):
-    """Activate a 7-day trial from the portal (creates license + emails key)."""
-    customer = await get_portal_user(request)
-    email = customer["email"].lower()
+    """Activate a 7-day trial from the portal."""
+    user = await _get_portal_user(request)
+    email = user["email"]
 
     # Check for existing trial
-    existing = supabase_client.table("portal_licenses").select("license_key").eq("customer_id", customer["id"]).eq("license_type", "trial").execute()
-    if existing.data:
-        return {"success": True, "message": "You already have a trial license. Check your email.", "existing": True}
-
-    # Also check JSON DB
     for key, lic in LICENSE_DATABASE.items():
         if lic.get('customer_email', '').lower() == email and lic.get('is_demo'):
-            # Sync to Supabase and re-send email
-            sync_license_to_supabase(email, customer.get('full_name', ''), customer.get('company', ''),
-                                     key, 'trial', 7, lic.get('expires', ''))
             if SMTP_USER:
                 try:
                     send_trial_email(email, key, lic.get('expires', '')[:10])
                 except Exception:
                     pass
-            return {"success": True, "message": "Trial license re-sent to your email.", "existing": True}
+            return {"success": True, "message": "You already have a trial license. Check your email.", "existing": True}
 
     # Generate new trial
     license_key = generate_license_key()
     expires = datetime.now() + timedelta(days=7)
     expires_date = expires.strftime('%Y-%m-%d')
-
     LICENSE_DATABASE[license_key] = {
-        'key': license_key,
-        'created_at': datetime.now().isoformat(),
-        'expires': expires.isoformat(),
-        'active': True,
-        'customer_email': email,
-        'hardware_id': None,
-        'duration_days': 7,
-        'is_demo': True,
-        'max_users': 1,
-        'payment': {
-            'method': 'trial',
-            'customer_name': customer.get('full_name', ''),
-            'company': customer.get('company', ''),
-            'completed_at': datetime.now().isoformat()
-        }
+        'key': license_key, 'created_at': datetime.now().isoformat(),
+        'expires': expires.isoformat(), 'active': True,
+        'customer_email': email, 'hardware_id': None, 'duration_days': 7,
+        'is_demo': True, 'max_users': 1,
+        'payment': {'method': 'trial', 'customer_name': user.get('full_name', ''), 'company': user.get('company', ''), 'completed_at': datetime.now().isoformat()}
     }
     save_database()
-    sync_license_to_supabase(email, customer.get('full_name', ''), customer.get('company', ''),
-                              license_key, 'trial', 7, expires.isoformat())
-
     if SMTP_USER:
         try:
             send_trial_email(email, license_key, expires_date)
         except Exception as e:
             print(f"[Portal Trial] Email error: {e}")
-
     return {"success": True, "message": "Trial license created and emailed!"}
 
 
@@ -957,15 +1028,19 @@ async def admin_portal_users(request: Request):
     token = request.query_params.get("token", "")
     if token != ADMIN_TOKEN:
         raise HTTPException(401, "Unauthorized")
-    if not supabase_client:
-        return {"users": [], "error": "Supabase not configured"}
-    result = supabase_client.table("portal_customers").select("*").order("created_at", desc=True).execute()
-    # Get license counts per customer
     users = []
-    for c in (result.data or []):
-        lics = supabase_client.table("portal_licenses").select("id").eq("customer_id", c["id"]).execute()
-        c["license_count"] = len(lics.data) if lics.data else 0
-        users.append(c)
+    for email, u in PORTAL_USERS.items():
+        my_lics = [lic for lic in LICENSE_DATABASE.values() if lic.get('customer_email', '').lower() == email]
+        users.append({
+            "email": u["email"],
+            "full_name": u.get("full_name", ""),
+            "company": u.get("company", ""),
+            "phone": u.get("phone", ""),
+            "created_at": u.get("created_at", ""),
+            "is_suspended": u.get("is_suspended", False),
+            "license_count": len(my_lics),
+        })
+    users.sort(key=lambda x: x.get('created_at', ''), reverse=True)
     return {"users": users}
 
 
@@ -975,13 +1050,15 @@ async def admin_toggle_portal_user(request: Request):
     body = await request.json()
     if body.get("admin_token") != ADMIN_TOKEN:
         raise HTTPException(401, "Unauthorized")
-    if not supabase_client:
-        raise HTTPException(503, "Supabase not configured")
-    customer_id = body.get("customer_id")
+    email = (body.get("email") or "").lower()
     action = body.get("action", "suspend")
-    is_suspended = action == "suspend"
-    supabase_client.table("portal_customers").update({"is_suspended": is_suspended}).eq("id", customer_id).execute()
-    return {"success": True, "suspended": is_suspended}
+    user = PORTAL_USERS.get(email)
+    if not user:
+        raise HTTPException(404, "User not found")
+    user["is_suspended"] = (action == "suspend")
+    PORTAL_USERS[email] = user
+    save_portal_users()
+    return {"success": True, "suspended": user["is_suspended"]}
 
 
 @app.get("/api/admin/portal-user/licenses")
@@ -990,13 +1067,21 @@ async def admin_portal_user_licenses(request: Request):
     token = request.query_params.get("token", "")
     if token != ADMIN_TOKEN:
         raise HTTPException(401, "Unauthorized")
-    if not supabase_client:
-        return {"licenses": []}
-    customer_id = request.query_params.get("customer_id", "")
-    if not customer_id:
-        raise HTTPException(400, "customer_id required")
-    result = supabase_client.table("portal_licenses").select("*").eq("customer_id", customer_id).order("created_at", desc=True).execute()
-    return {"licenses": result.data or []}
+    email = (request.query_params.get("email") or "").lower()
+    if not email:
+        raise HTTPException(400, "email required")
+    licenses = []
+    for key, lic in LICENSE_DATABASE.items():
+        if lic.get('customer_email', '').lower() == email:
+            licenses.append({
+                "license_key": key,
+                "license_type": "trial" if lic.get('is_demo') else ("annual" if lic.get('duration_days', 0) >= 365 else "monthly"),
+                "status": "active" if lic.get('active') else "expired",
+                "hardware_id": lic.get('hardware_id'),
+                "expires_at": lic.get('expires', ''),
+                "created_at": lic.get('created_at', ''),
+            })
+    return {"licenses": licenses}
 
 
 # ── SMTP Settings Admin API ──

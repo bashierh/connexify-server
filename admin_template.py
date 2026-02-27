@@ -513,14 +513,14 @@ ADMIN_HTML = """<!DOCTYPE html>
                     : '<span class="text-xs bg-green-600/20 text-green-400 px-2 py-0.5 rounded">Active</span>';
                 const date = u.created_at ? u.created_at.substring(0, 10) : 'N/A';
                 const toggleBtn = suspended
-                    ? `<button onclick="toggleUser('${u.id}','unsuspend')" class="px-2.5 py-1.5 rounded-md bg-green-700/50 hover:bg-green-600/50 text-xs text-green-300 transition" title="Unsuspend">&#10003;</button>`
-                    : `<button onclick="toggleUser('${u.id}','suspend')" class="px-2.5 py-1.5 rounded-md bg-red-700/50 hover:bg-red-600/50 text-xs text-red-300 transition" title="Suspend">&#10007;</button>`;
+                    ? `<button onclick="toggleUser('${u.email}','unsuspend')" class="px-2.5 py-1.5 rounded-md bg-green-700/50 hover:bg-green-600/50 text-xs text-green-300 transition" title="Unsuspend">&#10003;</button>`
+                    : `<button onclick="toggleUser('${u.email}','suspend')" class="px-2.5 py-1.5 rounded-md bg-red-700/50 hover:bg-red-600/50 text-xs text-red-300 transition" title="Suspend">&#10007;</button>`;
                 return `<tr class="border-b border-slate-700/30 hover:bg-slate-800/30 transition">
                     <td class="px-5 py-3 text-xs text-white">${u.full_name || '<span class="text-slate-600 italic">-</span>'}</td>
                     <td class="px-5 py-3 text-xs text-cyan-300">${u.email}</td>
                     <td class="px-5 py-3 text-xs">${u.company || '-'}</td>
                     <td class="px-5 py-3 text-xs">
-                        <button onclick="viewUserLicenses('${u.id}','${u.email}')" class="text-blue-400 hover:text-blue-300 underline">${u.license_count} license(s)</button>
+                        <button onclick="viewUserLicenses('${u.email}')" class="text-blue-400 hover:text-blue-300 underline">${u.license_count} license(s)</button>
                     </td>
                     <td class="px-5 py-3">${statusBadge}</td>
                     <td class="px-5 py-3 text-xs text-slate-400">${date}</td>
@@ -529,21 +529,21 @@ ADMIN_HTML = """<!DOCTYPE html>
             }).join('');
         }
 
-        async function toggleUser(customerId, action) {
+        async function toggleUser(email, action) {
             const r = await fetch(`${BASE}/api/admin/portal-user/toggle`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ admin_token: TOKEN, customer_id: customerId, action })
+                body: JSON.stringify({ admin_token: TOKEN, email: email, action })
             });
             const d = await r.json();
             if (d.success) { showToast('User ' + action + 'ed'); loadPortalUsers(); }
         }
 
-        async function viewUserLicenses(customerId, email) {
+        async function viewUserLicenses(email) {
             document.getElementById('user-licenses-email').textContent = email;
             document.getElementById('user-licenses-list').innerHTML = '<p class="text-slate-500 text-sm text-center py-4">Loading...</p>';
             document.getElementById('user-licenses-modal').classList.remove('hidden');
             document.getElementById('user-licenses-modal').classList.add('flex');
-            const r = await fetch(`${BASE}/api/admin/portal-user/licenses?token=${encodeURIComponent(TOKEN)}&customer_id=${customerId}`);
+            const r = await fetch(`${BASE}/api/admin/portal-user/licenses?token=${encodeURIComponent(TOKEN)}&email=${encodeURIComponent(email)}`);
             const d = await r.json();
             const list = document.getElementById('user-licenses-list');
             if (!d.licenses || d.licenses.length === 0) {
