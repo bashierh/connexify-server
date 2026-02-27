@@ -518,8 +518,14 @@ async def health_check():
     return {"service": "Connexa License Server", "status": "running", "version": "1.0.0", "licenses": len(LICENSE_DATABASE)}
 
 
-# Serve static files for downloads (DEB / EXE)
-STATIC_DIR = Path(__file__).parent / "static"
+# Serve static files for downloads (DEB / EXE / logos)
+# Use persistent disk on Render so files survive deploys
+_PERSISTENT_STATIC = Path("/opt/render/project/data/static")
+_LOCAL_STATIC = Path(__file__).parent / "static"
+if _PERSISTENT_STATIC.parent.exists():
+    STATIC_DIR = _PERSISTENT_STATIC
+else:
+    STATIC_DIR = _LOCAL_STATIC
 STATIC_DIR.mkdir(exist_ok=True)
 
 from fastapi.staticfiles import StaticFiles

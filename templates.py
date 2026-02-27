@@ -41,7 +41,7 @@ body{background:#030712;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif}
 _NAV = """<nav class="fixed top-0 w-full z-50 bg-gray-950/80 backdrop-blur-lg border-b border-gray-800/50">
 <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
 <a href="/" class="flex items-center gap-2.5 no-underline">
-<img src="/static/connexa-helmet-logo.png" alt="Connexify" class="w-9 h-9 rounded-lg object-contain">
+<img src="/static/connexa-helmet-logo.png" alt="Connexify" class="w-10 h-10 rounded-lg object-contain">
 <div><span class="text-lg font-bold text-white tracking-tight">Connexify</span><span class="text-[9px] text-gray-500 block -mt-1">(Pty) Ltd</span></div>
 </a>
 <div class="hidden lg:flex items-center gap-6 text-sm text-gray-400">
@@ -77,7 +77,7 @@ _FOOTER = """<footer class="border-t border-gray-800/30 bg-gray-950 pt-16 pb-8">
 <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
 <div>
 <div class="flex items-center gap-2.5 mb-4">
-<img src="/static/connexa-helmet-logo.png" alt="" class="w-8 h-8 rounded-lg object-contain">
+<img src="/static/connexa-helmet-logo.png" alt="" class="w-10 h-10 rounded-lg object-contain">
 <span class="text-lg font-bold text-white">Connexify</span>
 </div>
 <p class="text-sm text-gray-500 leading-relaxed mb-4">Professional network management solutions for ISPs, WISPs and MSPs across South Africa and beyond.</p>
