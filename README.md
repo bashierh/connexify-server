@@ -35,7 +35,7 @@ git push -u origin main
 
 6. Click **Create Web Service**
 
-Your site will be live at: `https://license-connexify.onrender.com`
+Your site will be live at: `https://connexify.co.za`
 
 ### 3. Upload installer files
 
@@ -43,43 +43,43 @@ Installer files are too large for GitHub (>100MB each). Upload them after deploy
 
 ```bash
 # Upload DEB installer
-curl -X POST https://license-license-connexify.onrender.com/api/admin/upload-installer \
+curl -X POST https://license-connexify.co.za/api/admin/upload-installer \
   -F "admin_token=YOUR_TOKEN" \
   -F "file=@native-app/dist/connexa_5.2.8_amd64.deb"
 
 # Upload EXE installer
-curl -X POST https://license-license-connexify.onrender.com/api/admin/upload-installer \
+curl -X POST https://license-connexify.co.za/api/admin/upload-installer \
   -F "admin_token=YOUR_TOKEN" \
   -F "file=@native-app/dist/Connexa-Setup-5.2.8.exe"
 
 # Verify uploads
-curl "https://license-license-connexify.onrender.com/api/admin/list-files?admin_token=YOUR_TOKEN"
+curl "https://license-connexify.co.za/api/admin/list-files?admin_token=YOUR_TOKEN"
 ```
 
 Files are stored on Render's persistent disk (1GB). Download URLs:
-- `https://license-license-connexify.onrender.com/static/connexa_5.2.8_amd64.deb`
-- `https://license-license-connexify.onrender.com/static/Connexa-Setup-5.2.8.exe`
+- `https://license-connexify.co.za/static/connexa_5.2.8_amd64.deb`
+- `https://license-connexify.co.za/static/Connexa-Setup-5.2.8.exe`
 
 ### 4. Update the license server URL in the app
 
 In `electron/license.cjs`, change:
 ```javascript
-this.serverUrl = process.env.LICENSE_SERVER_URL || 'https://license-connexify.onrender.com';
+this.serverUrl = process.env.LICENSE_SERVER_URL || 'https://connexify.co.za';
 ```
 
 ## Admin API Examples
 
 ```bash
 # Create a license
-curl -X POST https://license-connexify.onrender.com/api/admin/create-license \
+curl -X POST https://connexify.co.za/api/admin/create-license \
   -H "Content-Type: application/json" \
   -d '{"admin_token":"YOUR_TOKEN","duration_days":365,"customer_email":"client@example.com"}'
 
 # List all licenses
-curl "https://license-connexify.onrender.com/api/admin/list-licenses?admin_token=YOUR_TOKEN"
+curl "https://connexify.co.za/api/admin/list-licenses?admin_token=YOUR_TOKEN"
 
 # Delete a license
-curl -X POST https://license-connexify.onrender.com/api/admin/delete-license \
+curl -X POST https://connexify.co.za/api/admin/delete-license \
   -H "Content-Type: application/json" \
   -d '{"admin_token":"YOUR_TOKEN","license_key":"XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"}'
 ```
