@@ -46,7 +46,7 @@ _NAV = """<nav class="fixed top-0 w-full z-50 bg-gray-950/80 backdrop-blur-lg bo
 </a>
 <div class="hidden lg:flex items-center gap-6 text-sm text-gray-400">
 <a href="/#features" class="hover:text-white transition-colors no-underline">Features</a>
-<a href="/docs" class="hover:text-white transition-colors no-underline">Docs</a>
+<a href="/#about" class="hover:text-white transition-colors no-underline">About</a>
 <a href="/#downloads" class="hover:text-white transition-colors no-underline">Downloads</a>
 <a href="/#pricing" class="hover:text-white transition-colors no-underline">Pricing</a>
 <a href="/#faq" class="hover:text-white transition-colors no-underline">FAQ</a>
@@ -62,7 +62,7 @@ _NAV = """<nav class="fixed top-0 w-full z-50 bg-gray-950/80 backdrop-blur-lg bo
 <div id="mob-menu" class="hidden lg:hidden border-t border-gray-800/50 bg-gray-950/95 backdrop-blur-lg">
 <div class="px-4 py-4 space-y-1">
 <a href="/#features" class="block text-gray-400 hover:text-white py-2 no-underline">Features</a>
-<a href="/docs" class="block text-gray-400 hover:text-white py-2 no-underline">Documentation</a>
+<a href="/#about" class="block text-gray-400 hover:text-white py-2 no-underline">About</a>
 <a href="/#downloads" class="block text-gray-400 hover:text-white py-2 no-underline">Downloads</a>
 <a href="/#pricing" class="block text-gray-400 hover:text-white py-2 no-underline">Pricing</a>
 <a href="/#faq" class="block text-gray-400 hover:text-white py-2 no-underline">FAQ</a>
@@ -95,9 +95,9 @@ _FOOTER = """<footer class="border-t border-gray-800/30 bg-gray-950 pt-16 pb-8">
 <div>
 <h4 class="text-sm font-semibold text-white mb-4">Resources</h4>
 <ul class="space-y-2 text-sm text-gray-500">
-<li><a href="/docs" class="hover:text-gray-300 transition no-underline">Documentation</a></li>
-<li><a href="/docs#installation" class="hover:text-gray-300 transition no-underline">Installation Guide</a></li>
-<li><a href="/docs#troubleshooting" class="hover:text-gray-300 transition no-underline">Troubleshooting</a></li>
+<li><a href="/#about" class="hover:text-gray-300 transition no-underline">About Connexa</a></li>
+<li><a href="/#features" class="hover:text-gray-300 transition no-underline">Features</a></li>
+<li><a href="/#downloads" class="hover:text-gray-300 transition no-underline">Downloads</a></li>
 <li><a href="/#faq" class="hover:text-gray-300 transition no-underline">FAQ</a></li>
 </ul>
 </div>
@@ -115,7 +115,7 @@ _FOOTER = """<footer class="border-t border-gray-800/30 bg-gray-950 pt-16 pb-8">
 <div class="flex items-center gap-4 text-xs text-gray-600">
 <span>Version __VERSION__</span>
 <span>&bull;</span>
-<a href="/docs" class="hover:text-gray-400 transition no-underline">Docs</a>
+<a href="/#about" class="hover:text-gray-400 transition no-underline">About</a>
 <span>&bull;</span>
 <a href="/admin" class="hover:text-gray-400 transition no-underline">Admin</a>
 </div>
@@ -259,6 +259,81 @@ Monitor your towers, manage devices, automate configurations, and track wireless
 </div>
 </section>
 
+<!-- About -->
+<section id="about" class="border-t border-gray-800/20 py-20 bg-gray-950/40">
+<div class="max-w-5xl mx-auto px-6">
+<div class="text-center mb-12">
+<h2 class="text-3xl sm:text-4xl font-bold mb-4"><span class="grad-text">What is Connexa?</span></h2>
+<p class="text-gray-400 text-lg max-w-2xl mx-auto">A comprehensive network device management platform designed for ISPs, WISPs and MSPs.</p>
+</div>
+<div class="grid md:grid-cols-2 gap-8">
+<div class="glass rounded-2xl p-8">
+<h3 class="text-white font-semibold text-lg mb-4">&#128640; How It Works</h3>
+<p class="text-gray-400 text-sm leading-relaxed mb-3">Connexa runs as a desktop application that connects directly to your network devices via SNMP and API. It discovers, monitors, and manages devices from a single dashboard.</p>
+<ul class="text-sm text-gray-400 space-y-2">
+<li class="flex items-start gap-2"><span class="text-blue-400">&#9679;</span> Install on any Ubuntu/Windows machine on your network</li>
+<li class="flex items-start gap-2"><span class="text-blue-400">&#9679;</span> Add your device ranges and let Connexa auto-discover</li>
+<li class="flex items-start gap-2"><span class="text-blue-400">&#9679;</span> Monitor wireless clients, signal quality, and bandwidth</li>
+<li class="flex items-start gap-2"><span class="text-blue-400">&#9679;</span> Run bulk commands and scripts across multiple devices</li>
+<li class="flex items-start gap-2"><span class="text-blue-400">&#9679;</span> Schedule automated backups and maintenance tasks</li>
+</ul>
+</div>
+<div class="glass rounded-2xl p-8">
+<h3 class="text-white font-semibold text-lg mb-4">&#127759; Supported Vendors</h3>
+<div class="grid grid-cols-2 gap-4 mb-6">
+<div class="bg-gray-900/40 rounded-xl p-4 text-center">
+<div class="text-2xl mb-2">&#128225;</div>
+<p class="text-white text-sm font-medium">MikroTik</p>
+<p class="text-gray-500 text-xs">RouterOS API</p>
+</div>
+<div class="bg-gray-900/40 rounded-xl p-4 text-center">
+<div class="text-2xl mb-2">&#128225;</div>
+<p class="text-white text-sm font-medium">Ubiquiti</p>
+<p class="text-gray-500 text-xs">SNMP / API</p>
+</div>
+<div class="bg-gray-900/40 rounded-xl p-4 text-center">
+<div class="text-2xl mb-2">&#128225;</div>
+<p class="text-white text-sm font-medium">Cambium</p>
+<p class="text-gray-500 text-xs">SNMP</p>
+</div>
+<div class="bg-gray-900/40 rounded-xl p-4 text-center">
+<div class="text-2xl mb-2">&#128225;</div>
+<p class="text-white text-sm font-medium">Mimosa</p>
+<p class="text-gray-500 text-xs">SNMP</p>
+</div>
+</div>
+<p class="text-gray-500 text-xs text-center">Plus any SNMP-enabled device via custom templates</p>
+</div>
+</div>
+<div class="mt-10 glass rounded-2xl p-8">
+<h3 class="text-white font-semibold text-lg mb-4">&#128218; Quick Start Guide</h3>
+<div class="grid sm:grid-cols-4 gap-4">
+<div class="text-center">
+<div class="w-10 h-10 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center mx-auto mb-2">1</div>
+<p class="text-white text-sm font-medium">Download</p>
+<p class="text-gray-500 text-xs">Get the DEB or EXE installer</p>
+</div>
+<div class="text-center">
+<div class="w-10 h-10 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center mx-auto mb-2">2</div>
+<p class="text-white text-sm font-medium">Install</p>
+<p class="text-gray-500 text-xs">Run installer, enter license key</p>
+</div>
+<div class="text-center">
+<div class="w-10 h-10 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center mx-auto mb-2">3</div>
+<p class="text-white text-sm font-medium">Configure</p>
+<p class="text-gray-500 text-xs">Add device ranges and credentials</p>
+</div>
+<div class="text-center">
+<div class="w-10 h-10 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center mx-auto mb-2">4</div>
+<p class="text-white text-sm font-medium">Monitor</p>
+<p class="text-gray-500 text-xs">Dashboard shows all your devices</p>
+</div>
+</div>
+<p class="text-gray-500 text-xs text-center mt-6">A comprehensive User Guide is included with every installation &mdash; covers all features, Zabbix integration, troubleshooting and more.</p>
+</div>
+</div>
+</section>
+
 <!-- How It Works -->
 <section class="border-t border-gray-800/20 py-20 bg-gray-950/40">
 <div class="max-w-5xl mx-auto px-6">
@@ -350,8 +425,8 @@ Need a license key? <a href="/get-started" class="text-blue-400 hover:underline 
 <div class="card rounded-2xl p-8 border-blue-500/30 relative">
 <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full">Most Popular</div>
 <h3 class="text-lg font-semibold text-blue-400 mb-2">Professional</h3>
-<div class="text-4xl font-bold text-white mb-1">R600<span class="text-lg text-gray-500">/year</span></div>
-<p class="text-gray-500 text-sm mb-2">Per license &bull; Multiple licenses available</p>
+<div class="text-4xl font-bold text-white mb-1">R600<span class="text-lg text-gray-500">/mo</span></div>
+<p class="text-gray-500 text-sm mb-2">Per license &bull; R6 800/yr (save R400)</p>
 <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 mb-6">
 <p class="text-emerald-400 text-xs font-medium">&#9889; Pay securely online with PayFast</p>
 </div>
@@ -408,7 +483,7 @@ Need a license key? <a href="/get-started" class="text-blue-400 hover:underline 
 <span class="text-white font-medium text-sm">Can I pay with PayFast?</span>
 <span class="faq-icon text-gray-400 text-xl font-light">+</span>
 </button>
-<div class="faq-body px-6 text-sm text-gray-400 leading-relaxed"><div class="pb-4">Yes! We support PayFast for secure online payments. Licenses are R600 per year each. You can choose how many licenses you need and for how long (minimum 1 year). Pay with credit card, debit card, instant EFT, or other methods supported by PayFast. Select PayFast as your payment method during checkout in the Get Started wizard.</div></div>
+<div class="faq-body px-6 text-sm text-gray-400 leading-relaxed"><div class="pb-4">Yes! We support PayFast for secure online payments. Licenses are R600 per month or R6 800 per year (save R400). You can choose how many licenses you need and select monthly or annual billing. Pay with credit card, debit card, instant EFT, or other methods supported by PayFast. Select PayFast as your payment method during checkout in the Get Started wizard.</div></div>
 </div>
 <div class="glass rounded-xl overflow-hidden">
 <button class="w-full flex items-center justify-between px-6 py-4 text-left" onclick="toggleFaq(this)">
@@ -591,8 +666,8 @@ GET_STARTED_TEMPLATE = """<!DOCTYPE html>
 <button onclick="selectPlan('professional')" class="plan-card glass rounded-xl p-6 text-left hover:border-blue-500/50 transition border-blue-500/30" data-plan="professional">
 <div class="text-[10px] text-blue-400 font-semibold mb-1">RECOMMENDED</div>
 <h3 class="text-white font-semibold mb-1">Professional</h3>
-<div class="text-2xl font-bold text-white mb-1">R600<span class="text-sm text-gray-500">/year</span></div>
-<p class="text-gray-500 text-xs mb-3">Per license &bull; Unlimited devices</p>
+<div class="text-2xl font-bold text-white mb-1">R600<span class="text-sm text-gray-500">/mo</span></div>
+<p class="text-gray-500 text-xs mb-3">Per license &bull; R6 800/yr</p>
 <ul class="text-xs text-gray-400 space-y-1">
 <li>&#10003; Everything in Trial</li>
 <li>&#10003; Priority support</li>
@@ -649,12 +724,14 @@ GET_STARTED_TEMPLATE = """<!DOCTYPE html>
 <div id="step-3" class="step-panel hidden">
 <h2 class="text-xl font-bold text-white mb-6 text-center">Step 3: Payment</h2>
 
-<!-- Trial: skip payment -->
+<!-- Trial: generate license & email -->
 <div id="pay-trial" class="hidden max-w-md mx-auto glass rounded-2xl p-8 text-center">
 <div class="text-5xl mb-4">&#127881;</div>
 <h3 class="text-white font-semibold text-lg mb-2">No Payment Required!</h3>
-<p class="text-gray-400 text-sm mb-6">Your 7-day trial is completely free. No credit card or payment needed. Just download, install, and start monitoring.</p>
-<button onclick="nextStep(4)" class="glow-btn px-8 py-2.5 rounded-lg text-white text-sm font-medium">Continue to Download &rarr;</button>
+<p class="text-gray-400 text-sm mb-4">Your 7-day trial is completely free. No credit card needed.</p>
+<p class="text-gray-400 text-sm mb-6">Click below to generate your trial license key &mdash; it will be emailed to you instantly.</p>
+<div id="trial-status" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+<button id="btn-activate-trial" onclick="activateTrial()" class="glow-btn px-8 py-2.5 rounded-lg text-white text-sm font-medium">Activate Free Trial &rarr;</button>
 </div>
 
 <!-- Enterprise: contact us -->
@@ -683,23 +760,26 @@ GET_STARTED_TEMPLATE = """<!DOCTYPE html>
 </div>
 </div>
 
-<!-- Duration selector -->
-<div class="flex items-center justify-between bg-gray-900/40 rounded-xl p-4 mb-4">
-<div>
-<label class="text-white text-sm font-medium">License Duration</label>
-<p class="text-gray-500 text-[11px]">Minimum 1 year</p>
-</div>
-<div class="flex items-center gap-3">
-<button onclick="changeDuration(-1)" class="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 text-white text-lg flex items-center justify-center hover:border-blue-500 transition">-</button>
-<span id="dur-display" class="text-white font-bold text-lg w-12 text-center">1 yr</span>
-<button onclick="changeDuration(1)" class="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 text-white text-lg flex items-center justify-center hover:border-blue-500 transition">+</button>
+<!-- Billing cycle selector -->
+<div class="bg-gray-900/40 rounded-xl p-4 mb-4">
+<label class="text-white text-sm font-medium block mb-3">Billing Cycle</label>
+<div class="grid grid-cols-2 gap-3">
+<button onclick="setBilling('monthly')" id="btn-monthly" class="billing-opt rounded-xl p-3 text-center border-2 border-blue-500 bg-blue-500/10 transition">
+<div class="text-white font-bold text-lg">R600</div>
+<div class="text-gray-400 text-xs">per month</div>
+</button>
+<button onclick="setBilling('annual')" id="btn-annual" class="billing-opt rounded-xl p-3 text-center border-2 border-gray-700 hover:border-blue-500/50 transition">
+<div class="text-white font-bold text-lg">R6 800</div>
+<div class="text-gray-400 text-xs">per year</div>
+<div class="text-emerald-400 text-[10px] font-medium mt-0.5">Save R400/yr</div>
+</button>
 </div>
 </div>
 
 <!-- Price summary -->
 <div class="border-t border-gray-700/50 pt-4">
 <div class="flex justify-between text-sm text-gray-400 mb-1">
-<span>R600 &times; <span id="price-qty">1</span> license(s) &times; <span id="price-dur">1</span> year(s)</span>
+<span id="price-breakdown">R600 &times; 1 license(s) &times; 1 month</span>
 </div>
 <div class="flex justify-between items-end">
 <span class="text-gray-400 text-sm">Total</span>
@@ -798,17 +878,22 @@ GET_STARTED_TEMPLATE = """<!DOCTYPE html>
 <div class="text-center mb-6">
 <div class="text-5xl mb-3">&#127942;</div>
 <h3 class="text-white font-semibold text-lg">You're All Set!</h3>
-<p class="text-gray-400 text-sm mt-2">Your 7-day trial starts automatically when you first launch Connexa. No license key needed for the trial period.</p>
+<p class="text-gray-400 text-sm mt-2">Your 7-day trial license key has been generated and emailed to you.</p>
+</div>
+<div id="trial-key-display" class="bg-gray-900/60 border border-cyan-500/30 rounded-xl p-5 mb-4 text-center hidden">
+<p class="text-gray-500 text-xs mb-1">Your Trial License Key</p>
+<p id="trial-key-value" class="text-cyan-400 font-mono text-lg font-bold tracking-wider"></p>
 </div>
 <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-sm text-blue-300">
 <p class="font-medium mb-1">What's Next:</p>
 <ol class="list-decimal ml-4 space-y-1 text-blue-400/80">
-<li>Launch Connexa on your machine</li>
-<li>Log in with the default credentials</li>
-<li>Add your first device (Settings &rarr; Devices)</li>
-<li>Watch your dashboard come alive!</li>
+<li>Check your email for the trial license key</li>
+<li>Download and install Connexa</li>
+<li>Enter your license key when prompted</li>
+<li>Enjoy full access for 7 days!</li>
 </ol>
 </div>
+<p class="text-gray-500 text-xs mt-3 text-center">Ready to upgrade? <a href="/get-started?plan=professional" class="text-blue-400 no-underline">Get a full license</a> starting at R600/month.</p>
 </div>
 <div id="activate-paid" class="hidden">
 <div class="text-center mb-6">
@@ -835,7 +920,7 @@ GET_STARTED_TEMPLATE = """<!DOCTYPE html>
 </div>
 <div class="mt-8 flex items-center justify-between">
 <button onclick="prevStep(4)" class="px-6 py-2.5 rounded-lg border border-gray-700 text-gray-400 hover:text-white text-sm transition">&larr; Back</button>
-<a href="/docs" class="glow-btn px-8 py-2.5 rounded-lg text-white text-sm font-medium no-underline">Read Documentation &rarr;</a>
+<a href="/" class="glow-btn px-8 py-2.5 rounded-lg text-white text-sm font-medium no-underline">Back to Homepage &rarr;</a>
 </div>
 </div>
 </div>
@@ -845,8 +930,8 @@ GET_STARTED_TEMPLATE = """<!DOCTYPE html>
 """ + _SHARED_JS + """
 <script>
 let currentStep=1, selectedPlan='', selectedPayment='';
-let licenseQty=1, licenseDuration=1;
-const PRICE_PER_LICENSE=600;
+let licenseQty=1, billingCycle='monthly';
+const PRICE_MONTHLY=600, PRICE_ANNUAL=6800;
 
 // Check URL params for pre-selected plan
 const params=new URLSearchParams(window.location.search);
@@ -857,20 +942,24 @@ function changeQty(delta){
   document.getElementById('qty-display').textContent=licenseQty;
   updatePrice();
 }
-function changeDuration(delta){
-  licenseDuration=Math.max(1,Math.min(10,licenseDuration+delta));
-  document.getElementById('dur-display').textContent=licenseDuration+' yr'+(licenseDuration>1?'s':'');
+function setBilling(cycle){
+  billingCycle=cycle;
+  document.querySelectorAll('.billing-opt').forEach(b=>{b.style.borderColor='#374151';b.style.background='transparent'});
+  const btn=document.getElementById('btn-'+cycle);
+  btn.style.borderColor='#3b82f6';btn.style.background='rgba(59,130,246,0.1)';
   updatePrice();
 }
 function updatePrice(){
-  const total=PRICE_PER_LICENSE*licenseQty*licenseDuration;
-  document.getElementById('price-qty').textContent=licenseQty;
-  document.getElementById('price-dur').textContent=licenseDuration;
+  const unitPrice=billingCycle==='annual'?PRICE_ANNUAL:PRICE_MONTHLY;
+  const total=unitPrice*licenseQty;
+  const period=billingCycle==='annual'?'year':'month';
+  const label=billingCycle==='annual'?'R6,800':'R600';
+  document.getElementById('price-breakdown').textContent=label+' x '+licenseQty+' license(s) x 1 '+period;
   document.getElementById('price-total').textContent='R'+total.toLocaleString();
   // Update PayFast message if visible
   const msg=document.getElementById('payment-msg');
   if(selectedPayment==='payfast' && !msg.classList.contains('hidden')){
-    msg.innerHTML='<div class="text-emerald-400 font-medium mb-1">&#9889; PayFast Secure Checkout</div><p class="text-gray-400 text-xs">You\\'ll be redirected to PayFast to pay <strong class="text-white">R'+total.toLocaleString()+'</strong> for '+licenseQty+' license(s) x '+licenseDuration+' year(s). Your license key(s) will be generated and emailed automatically.</p>';
+    msg.innerHTML='<div class="text-emerald-400 font-medium mb-1">&#9889; PayFast Secure Checkout</div><p class="text-gray-400 text-xs">You\\'ll be redirected to PayFast to pay <strong class="text-white">R'+total.toLocaleString()+'</strong> for '+licenseQty+' license(s) ('+period+'ly). Your license key(s) will be generated and emailed automatically.</p>';
   }
 }
 
@@ -890,8 +979,10 @@ function selectPayment(method){
   const msg=document.getElementById('payment-msg');
   msg.classList.remove('hidden');
   if(method==='payfast'){
-    const total=PRICE_PER_LICENSE*licenseQty*licenseDuration;
-    msg.innerHTML='<div class="text-emerald-400 font-medium mb-1">&#9889; PayFast Secure Checkout</div><p class="text-gray-400 text-xs">You\\'ll be redirected to PayFast to pay <strong class="text-white">R'+total.toLocaleString()+'</strong> for '+licenseQty+' license(s) x '+licenseDuration+' year(s). Your license key(s) will be generated and emailed automatically.</p>';
+    const unitPrice=billingCycle==='annual'?PRICE_ANNUAL:PRICE_MONTHLY;
+    const total=unitPrice*licenseQty;
+    const period=billingCycle==='annual'?'year':'month';
+    msg.innerHTML='<div class="text-emerald-400 font-medium mb-1">&#9889; PayFast Secure Checkout</div><p class="text-gray-400 text-xs">You\\'ll be redirected to PayFast to pay <strong class="text-white">R'+total.toLocaleString()+'</strong> for '+licenseQty+' license(s) ('+period+'ly). Your license key(s) will be generated and emailed automatically.</p>';
   }else if(method==='eft'){
     msg.innerHTML='<div class="text-blue-400 font-medium mb-1">&#127974; EFT / Bank Transfer</div><p class="text-gray-400 text-xs mb-2">Banking Details:</p><div class="bg-gray-900/50 rounded-lg p-3 text-xs"><p><strong class="text-white">Bank:</strong> FNB</p><p><strong class="text-white">Account:</strong> __COMPANY__ (Pty) Ltd</p><p><strong class="text-white">Reference:</strong> Your email address</p></div><p class="text-gray-500 text-[11px] mt-2">License key will be emailed within 24 hours of payment confirmation.</p>';
   }else{
@@ -938,14 +1029,13 @@ async function submitPayment(){
   if(!email){alert('Please go back and fill in your details');return}
 
   if(selectedPayment==='payfast' && selectedPlan==='professional'){
-    // POST form to PayFast with quantity and duration
+    // POST form to PayFast
     try{
       const res=await fetch('/api/payfast/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-        name,email,company,plan:selectedPlan,quantity:licenseQty,duration_years:licenseDuration
+        name,email,company,plan:selectedPlan,quantity:licenseQty,billing_cycle:billingCycle
       })});
       const data=await res.json();
       if(data.form_fields && data.payfast_url){
-        // Create hidden form and POST to PayFast
         const form=document.createElement('form');
         form.method='POST';
         form.action=data.payfast_url;
@@ -966,26 +1056,65 @@ async function submitPayment(){
     }catch(e){alert('Payment error. Please try again.');return}
   }
 
-  // EFT / Invoice - send contact form with quantity and duration
-  const total=PRICE_PER_LICENSE*licenseQty*licenseDuration;
+  // Trial plan - already handled by activateTrial()
+  if(selectedPlan==='trial'){nextStep(4);return}
+
+  // EFT / Invoice - send contact form
+  const unitPrice=billingCycle==='annual'?PRICE_ANNUAL:PRICE_MONTHLY;
+  const total=unitPrice*licenseQty;
+  const period=billingCycle==='annual'?'annual':'monthly';
   try{
     await fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       name,email,company,subject:'License Order - '+selectedPlan+' ('+selectedPayment+')',
-      message:'Plan: '+selectedPlan+'\\nPayment: '+selectedPayment+'\\nLicenses: '+licenseQty+'\\nDuration: '+licenseDuration+' year(s)\\nTotal: R'+total+'\\nDevices: '+(document.getElementById('gs-devices')?.value||'N/A')
+      message:'Plan: '+selectedPlan+'\\nPayment: '+selectedPayment+'\\nLicenses: '+licenseQty+'\\nBilling: '+period+'\\nTotal: R'+total+'\\nDevices: '+(document.getElementById('gs-devices')?.value||'N/A')
     })});
   }catch(e){}
   nextStep(4);
+}
+async function activateTrial(){
+  const name=document.getElementById('gs-name')?.value||'';
+  const email=document.getElementById('gs-email')?.value||'';
+  const company=document.getElementById('gs-company')?.value||'';
+  if(!email){alert('Please go back to Step 2 and enter your email address.');return}
+
+  const btn=document.getElementById('btn-activate-trial');
+  const status=document.getElementById('trial-status');
+  btn.disabled=true;
+  btn.textContent='Generating...';
+  btn.style.opacity='0.5';
+
+  try{
+    const res=await fetch('/api/trial/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,company})});
+    const data=await res.json();
+    if(data.success){
+      status.className='mb-4 p-3 rounded-lg text-sm bg-green-500/10 border border-green-500/30 text-green-400';
+      status.innerHTML='&#10003; '+data.message+' Check your inbox (and spam folder).';
+      status.classList.remove('hidden');
+      btn.textContent='Trial Activated!';
+      btn.style.background='#22c55e';
+      // Auto-advance after short delay
+      setTimeout(()=>nextStep(4),2000);
+    }else{
+      status.className='mb-4 p-3 rounded-lg text-sm bg-red-500/10 border border-red-500/30 text-red-400';
+      status.textContent=data.detail||'Something went wrong. Please try again.';
+      status.classList.remove('hidden');
+      btn.disabled=false;btn.textContent='Activate Free Trial \u2192';btn.style.opacity='1';
+    }
+  }catch(e){
+    status.className='mb-4 p-3 rounded-lg text-sm bg-red-500/10 border border-red-500/30 text-red-400';
+    status.textContent='Connection error. Please try again.';
+    status.classList.remove('hidden');
+    btn.disabled=false;btn.textContent='Activate Free Trial \u2192';btn.style.opacity='1';
+  }
 }
 </script>
 </body>
 </html>"""
 
 
-# ══════════════════════════════════════════════════════════════════
-#   DOCUMENTATION
-# ══════════════════════════════════════════════════════════════════
+# (Documentation template removed — About section is now on homepage)
 
-DOCS_TEMPLATE = """<!DOCTYPE html>
+_REMOVED_DOCS = """<!DOCTYPE html>
 <html lang="en">
 <head>
 """ + _HEAD + """
