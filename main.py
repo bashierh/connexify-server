@@ -224,7 +224,7 @@ WEBSITE_HTML = f"""<!DOCTYPE html>
     <nav class="fixed top-0 w-full z-50 bg-gray-950/80 backdrop-blur-lg border-b border-gray-800/50">
         <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center font-bold text-white text-lg">C</div>
+                <img src="/static/connexa-helmet-logo.png" alt="Connexify" class="w-10 h-10 rounded-lg object-contain">
                 <div>
                     <span class="text-xl font-bold text-white">Connexify</span>
                     <span class="text-[10px] text-gray-500 block -mt-1">(Pty) Ltd</span>
@@ -667,9 +667,9 @@ async def upload_installer(admin_token: str = Form(...), file: UploadFile = File
     if admin_token != ADMIN_TOKEN:
         raise HTTPException(status_code=403, detail="Unauthorized")
     
-    allowed_ext = ('.deb', '.exe', '.AppImage', '.dmg', '.zip')
+    allowed_ext = ('.deb', '.exe', '.AppImage', '.dmg', '.zip', '.png', '.jpg', '.jpeg', '.svg', '.ico', '.gif', '.webp')
     if not any(file.filename.endswith(ext) for ext in allowed_ext):
-        raise HTTPException(status_code=400, detail=f"Only installer files allowed: {allowed_ext}")
+        raise HTTPException(status_code=400, detail=f"Only installer/image files allowed: {allowed_ext}")
     
     filepath = os.path.join(STATIC_DIR, file.filename)
     contents = await file.read()
