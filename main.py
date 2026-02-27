@@ -23,6 +23,8 @@ from email.mime.multipart import MIMEMultipart
 
 # ── Website templates ──
 from templates import WEBSITE_TEMPLATE, GET_STARTED_TEMPLATE
+from portal_template import PORTAL_TEMPLATE
+from admin_template import ADMIN_HTML
 
 app = FastAPI(title="Connexa License Server", version="1.0.0")
 
@@ -42,12 +44,12 @@ if not LICENSE_DB_FILE.parent.exists():
 
 ADMIN_TOKEN = os.getenv("ADMIN_SECRET_TOKEN", "your-admin-secret-token-change-this")
 CURRENT_VERSION = os.getenv("CONNEXA_VERSION", "5.2.8")
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_HOST = os.getenv("SMTP_HOST", "mail.connexify.co.za")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASS = os.getenv("SMTP_PASSWORD", "")
+SMTP_USER = os.getenv("SMTP_USER", "admin@connexify.co.za")
+SMTP_PASS = os.getenv("SMTP_PASSWORD", "159951B@sh!")
 FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USER)
-FROM_NAME = os.getenv("FROM_NAME", "Bashier Hendricks")
+FROM_NAME = os.getenv("FROM_NAME", "Connexify")
 COMPANY_NAME = os.getenv("COMPANY_NAME", "Connexify")
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "admin@connexify.co.za")
 
@@ -57,6 +59,20 @@ PAYFAST_MERCHANT_KEY = os.getenv("PAYFAST_MERCHANT_KEY", "4xkai7s4ataw7")
 PAYFAST_PASSPHRASE = os.getenv("PAYFAST_PASSPHRASE", "159951Bashier")
 PAYFAST_URL = os.getenv("PAYFAST_URL", "https://www.payfast.co.za/eng/process")
 SITE_URL = os.getenv("SITE_URL", "https://www.connexify.co.za")
+
+# ── Supabase configuration ──
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+
+supabase_client = None
+if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+    try:
+        from supabase import create_client
+        supabase_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        print(f"[Supabase] Connected to {SUPABASE_URL}")
+    except Exception as e:
+        print(f"[Supabase] Init error: {e}")
 
 # In-memory database
 LICENSE_DATABASE = {}
@@ -267,11 +283,13 @@ def _render_template(template: str) -> str:
         .replace("__VERSION__", CURRENT_VERSION)
         .replace("__EMAIL__", SUPPORT_EMAIL)
         .replace("__YEAR__", str(datetime.now().year))
-        .replace("__COMPANY__", COMPANY_NAME))
+        .replace("__COMPANY__", COMPANY_NAME)
+        .replace("__SUPABASE_URL__", SUPABASE_URL)
+        .replace("__SUPABASE_ANON_KEY__", SUPABASE_ANON_KEY))
 
 WEBSITE_HTML = _render_template(WEBSITE_TEMPLATE)
 GET_STARTED_HTML = _render_template(GET_STARTED_TEMPLATE)
-# DOCS_HTML removed — docs is now the About section on homepage
+PORTAL_HTML = _render_template(PORTAL_TEMPLATE)
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -288,6 +306,12 @@ async def homepage():
 async def get_started_page():
     """Step-by-step get started wizard"""
     return HTMLResponse(content=GET_STARTED_HTML)
+
+
+@app.get("/portal", response_class=HTMLResponse)
+async def portal_page():
+    """Customer portal dashboard"""
+    return HTMLResponse(content=PORTAL_HTML)
 
 
 @app.get("/docs", response_class=HTMLResponse)
@@ -334,6 +358,7 @@ class TrialRequest(BaseModel):
     name: str
     email: str
     company: str = ""
+    password: str = ""
 
 
 def send_trial_email(customer_email: str, license_key: str, expires_date: str):
@@ -361,6 +386,9 @@ def send_trial_email(customer_email: str, license_key: str, expires_date: str):
             <li>Enjoy full access for 7 days!</li>
         </ol>
         <div style="background: #1e3a5f; border: 1px solid #2563eb; border-radius: 8px; padding: 16px; margin: 20px 0;">
+            <p style="color: #93c5fd; margin: 0; font-size: 14px;"><strong>&#128187; Manage your license online</strong> — Log in to your customer portal at <a href="https://www.connexify.co.za/portal" style="color: #60a5fa;">connexify.co.za/portal</a> using the email and password you chose during signup.</p>
+        </div>
+        <div style="background: #1e3a5f; border: 1px solid #2563eb; border-radius: 8px; padding: 16px; margin: 10px 0;">
             <p style="color: #93c5fd; margin: 0; font-size: 14px;"><strong>&#128161; Ready to upgrade?</strong> When your trial ends, visit <a href="https://www.connexify.co.za/get-started?plan=professional" style="color: #60a5fa;">connexify.co.za/get-started</a> to purchase a full license. Plans start at R600/month.</p>
         </div>
         <hr style="border: none; border-top: 1px solid #334155; margin: 24px 0;">
@@ -400,6 +428,22 @@ async def activate_trial(request: TrialRequest):
                     send_trial_email(email, existing_key, expires_date[:10] if len(expires_date) > 10 else expires_date)
                 except Exception as e:
                     print(f"[Trial] Email re-send error: {e}")
+            # Create portal account if password provided and account doesn't exist yet
+            if supabase_client and request.password and len(request.password) >= 6:
+                try:
+                    existing_auth = supabase_client.table("portal_customers").select("auth_id").eq("email", email).execute()
+                    if not existing_auth.data or not existing_auth.data[0].get("auth_id"):
+                        auth_response = supabase_client.auth.admin.create_user({
+                            "email": email,
+                            "password": request.password,
+                            "email_confirm": True,
+                            "user_metadata": {"full_name": request.name, "company": request.company}
+                        })
+                        if auth_response and auth_response.user:
+                            supabase_client.table("portal_customers").update({"auth_id": str(auth_response.user.id)}).eq("email", email).execute()
+                            print(f"[Trial] Portal account created on re-send for {email}")
+                except Exception as e:
+                    print(f"[Trial] Auth create on re-send error: {e}")
             return {"success": True, "message": "Trial license re-sent to your email.", "existing": True}
 
     # Generate new 7-day trial license
@@ -427,6 +471,29 @@ async def activate_trial(request: TrialRequest):
     save_database()
     print(f"[Trial] 7-day trial license created for {email}: {license_key}")
 
+    # Sync to Supabase portal
+    sync_license_to_supabase(email, request.name, request.company, license_key, 'trial', 7, expires.isoformat())
+
+    # Create Supabase auth account if password provided
+    if supabase_client and request.password and len(request.password) >= 6:
+        try:
+            auth_response = supabase_client.auth.admin.create_user({
+                "email": email,
+                "password": request.password,
+                "email_confirm": True,
+                "user_metadata": {
+                    "full_name": request.name,
+                    "company": request.company
+                }
+            })
+            # Link auth_id to customer record
+            if auth_response and auth_response.user:
+                auth_id = str(auth_response.user.id)
+                supabase_client.table("portal_customers").update({"auth_id": auth_id}).eq("email", email).execute()
+                print(f"[Trial] Portal account created for {email}")
+        except Exception as e:
+            print(f"[Trial] Supabase auth create error (may already exist): {e}")
+
     # Send trial welcome email
     if SMTP_USER:
         try:
@@ -435,7 +502,8 @@ async def activate_trial(request: TrialRequest):
         except Exception as e:
             print(f"[Trial] Email error: {e}")
 
-    return {"success": True, "message": "Trial license created and emailed!", "existing": False}
+    portal_msg = " Your portal account is ready — log in at /portal" if (request.password and len(request.password) >= 6) else ""
+    return {"success": True, "message": f"Trial license created and emailed!{portal_msg}", "existing": False}
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -563,6 +631,30 @@ async def payfast_notify(request: Request):
         save_database()
         print(f"[PayFast ITN] {qty} license(s) created for {customer_email}: {license_keys}")
 
+        # Sync each license to Supabase portal
+        lic_type = "annual" if is_annual else "monthly"
+        for lk in license_keys:
+            exp_iso = (datetime.now() + timedelta(days=duration_days)).isoformat()
+            sync_license_to_supabase(customer_email, f"{name_first} {name_last}".strip(), company,
+                                      lk, lic_type, duration_days, exp_iso)
+
+        # Create payment record in Supabase
+        if supabase_client:
+            try:
+                cust = supabase_client.table("portal_customers").select("id").eq("email", customer_email.lower()).execute()
+                if cust.data:
+                    supabase_client.table("portal_payments").insert({
+                        "customer_id": cust.data[0]["id"],
+                        "amount_rands": float(amount_gross),
+                        "payment_method": "payfast",
+                        "payment_reference": m_payment_id,
+                        "payfast_payment_id": pf_payment_id,
+                        "status": "complete",
+                        "description": f"{qty}x Professional ({cycle_label})",
+                    }).execute()
+            except Exception as e:
+                print(f"[Supabase] Payment record error: {e}")
+
         # Send license email with all keys
         if SMTP_USER and customer_email:
             try:
@@ -577,6 +669,500 @@ async def payfast_notify(request: Request):
         print(f"[PayFast ITN] Status: {payment_status} for {m_payment_id}")
 
     return {"status": "ok"}
+
+
+# ══════════════════════════════════════════════════════════════════
+#   SUPABASE SYNC HELPERS
+# ══════════════════════════════════════════════════════════════════
+
+async def get_portal_user(request: Request):
+    """Validate portal user from Supabase JWT and return/create customer record."""
+    if not supabase_client:
+        raise HTTPException(503, "Portal not configured")
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(401, "Not authenticated")
+    token = auth_header.split(" ")[1]
+    try:
+        user_response = supabase_client.auth.get_user(token)
+        auth_user = user_response.user
+    except Exception:
+        raise HTTPException(401, "Invalid or expired token")
+
+    auth_id = str(auth_user.id)
+    # Look up by auth_id first
+    result = supabase_client.table("portal_customers").select("*").eq("auth_id", auth_id).execute()
+    if result.data:
+        customer = result.data[0]
+        if customer.get('is_suspended'):
+            raise HTTPException(403, "Account suspended. Contact support.")
+        return customer
+    # Look up by email (customer may have been created before portal registration)
+    result = supabase_client.table("portal_customers").select("*").eq("email", auth_user.email).execute()
+    if result.data:
+        customer = result.data[0]
+        supabase_client.table("portal_customers").update({"auth_id": auth_id}).eq("id", customer["id"]).execute()
+        if customer.get('is_suspended'):
+            raise HTTPException(403, "Account suspended. Contact support.")
+        return customer
+    # Create new customer
+    meta = auth_user.user_metadata or {}
+    new_cust = {
+        "auth_id": auth_id,
+        "email": auth_user.email,
+        "full_name": meta.get("full_name", ""),
+        "company": meta.get("company", ""),
+    }
+    result = supabase_client.table("portal_customers").insert(new_cust).execute()
+    return result.data[0]
+
+
+def sync_license_to_supabase(email: str, name: str, company: str, license_key: str,
+                              license_type: str, duration_days: int, expires_iso: str):
+    """Create/update customer and license records in Supabase portal tables."""
+    if not supabase_client:
+        return
+    try:
+        email_lower = email.lower()
+        result = supabase_client.table("portal_customers").select("id").eq("email", email_lower).execute()
+        if result.data:
+            customer_id = result.data[0]["id"]
+        else:
+            ins = supabase_client.table("portal_customers").insert({
+                "email": email_lower, "full_name": name, "company": company
+            }).execute()
+            customer_id = ins.data[0]["id"]
+
+        supabase_client.table("portal_licenses").insert({
+            "customer_id": customer_id,
+            "license_key": license_key,
+            "license_type": license_type,
+            "status": "active",
+            "duration_days": duration_days,
+            "expires_at": expires_iso,
+        }).execute()
+
+        billing_cycle = license_type
+        plan = "trial" if license_type == "trial" else "professional"
+        amount = 0 if license_type == "trial" else (6800 if license_type == "annual" else 600)
+        supabase_client.table("portal_subscriptions").insert({
+            "customer_id": customer_id,
+            "plan": plan,
+            "billing_cycle": billing_cycle,
+            "status": "active",
+            "amount_rands": amount,
+            "current_period_end": expires_iso,
+        }).execute()
+
+        print(f"[Supabase] Synced license {license_key} for {email_lower}")
+    except Exception as e:
+        print(f"[Supabase] Sync error: {e}")
+
+
+# ══════════════════════════════════════════════════════════════════
+#   ROUTES - Customer Portal API
+# ══════════════════════════════════════════════════════════════════
+
+@app.get("/api/portal/me")
+async def portal_me(request: Request):
+    """Get current user profile and stats."""
+    customer = await get_portal_user(request)
+    cid = customer["id"]
+    licenses = supabase_client.table("portal_licenses").select("id").eq("customer_id", cid).execute()
+    subs = supabase_client.table("portal_subscriptions").select("plan,status").eq("customer_id", cid).order("created_at", desc=True).limit(1).execute()
+    current_plan = subs.data[0]["plan"].capitalize() if subs.data else None
+    return {
+        "customer": customer,
+        "stats": {
+            "total_licenses": len(licenses.data) if licenses.data else 0,
+            "current_plan": current_plan,
+        }
+    }
+
+
+@app.put("/api/portal/profile")
+async def portal_update_profile(request: Request):
+    """Update customer profile (name, company, phone)."""
+    customer = await get_portal_user(request)
+    body = await request.json()
+    update = {}
+    if "full_name" in body: update["full_name"] = body["full_name"]
+    if "company" in body: update["company"] = body["company"]
+    if "phone" in body: update["phone"] = body["phone"]
+    if update:
+        supabase_client.table("portal_customers").update(update).eq("id", customer["id"]).execute()
+    return {"success": True}
+
+
+@app.get("/api/portal/licenses")
+async def portal_licenses(request: Request):
+    """List customer's licenses."""
+    customer = await get_portal_user(request)
+    result = supabase_client.table("portal_licenses").select("*").eq("customer_id", customer["id"]).order("created_at", desc=True).execute()
+    # Sync hardware_id from JSON DB
+    for lic in (result.data or []):
+        key = lic.get("license_key", "")
+        if key in LICENSE_DATABASE:
+            json_lic = LICENSE_DATABASE[key]
+            if json_lic.get("hardware_id") and not lic.get("hardware_id"):
+                supabase_client.table("portal_licenses").update({"hardware_id": json_lic["hardware_id"]}).eq("id", lic["id"]).execute()
+                lic["hardware_id"] = json_lic["hardware_id"]
+    return {"licenses": result.data or []}
+
+
+@app.post("/api/portal/link-license")
+async def portal_link_license(request: Request):
+    """Link an existing license key to this customer's portal account."""
+    customer = await get_portal_user(request)
+    body = await request.json()
+    key = body.get("license_key", "").strip().upper()
+    if key not in LICENSE_DATABASE:
+        raise HTTPException(404, "License key not found")
+    lic = LICENSE_DATABASE[key]
+    existing = supabase_client.table("portal_licenses").select("id").eq("license_key", key).execute()
+    if existing.data:
+        raise HTTPException(400, "License already linked to an account")
+    if lic.get("customer_email", "").lower() != customer["email"].lower():
+        raise HTTPException(403, "This license belongs to a different email address")
+    portal_lic = {
+        "customer_id": customer["id"],
+        "license_key": key,
+        "license_type": "trial" if lic.get("is_demo") else ("annual" if lic.get("duration_days", 0) >= 365 else "monthly"),
+        "status": "active" if lic.get("active") else "expired",
+        "hardware_id": lic.get("hardware_id"),
+        "duration_days": lic.get("duration_days", 7),
+        "expires_at": lic.get("expires", ""),
+    }
+    supabase_client.table("portal_licenses").insert(portal_lic).execute()
+    return {"success": True, "message": "License linked to your account"}
+
+
+@app.get("/api/portal/subscription")
+async def portal_subscription(request: Request):
+    """Get current subscription and payment history."""
+    customer = await get_portal_user(request)
+    cid = customer["id"]
+    subs = supabase_client.table("portal_subscriptions").select("*").eq("customer_id", cid).order("created_at", desc=True).limit(1).execute()
+    payments = supabase_client.table("portal_payments").select("*").eq("customer_id", cid).order("created_at", desc=True).limit(20).execute()
+    return {
+        "subscription": subs.data[0] if subs.data else None,
+        "payments": payments.data or []
+    }
+
+
+@app.post("/api/portal/subscribe")
+async def portal_subscribe(request: Request):
+    """Create PayFast checkout for subscription from the customer portal."""
+    customer = await get_portal_user(request)
+    body = await request.json()
+    cycle = body.get("billing_cycle", "monthly")
+    if cycle not in ("monthly", "annual"): cycle = "monthly"
+    qty = max(1, min(100, body.get("quantity", 1)))
+    price = 6800 if cycle == "annual" else 600
+    total = price * qty
+    payment_id = secrets.token_hex(8)
+    cycle_label = "1 Year" if cycle == "annual" else "1 Month"
+    item_name = f"Connexa Professional License x{qty} ({cycle_label})"
+    item_desc = f"{qty} license(s), {cycle_label}, via Customer Portal"
+    name_parts = (customer.get("full_name") or "").split()
+    data = {
+        "merchant_id": PAYFAST_MERCHANT_ID,
+        "merchant_key": PAYFAST_MERCHANT_KEY,
+        "return_url": f"{SITE_URL}/portal?payment=success&id={payment_id}",
+        "cancel_url": f"{SITE_URL}/portal?payment=cancelled",
+        "notify_url": f"{SITE_URL}/api/payfast/notify",
+        "name_first": name_parts[0] if name_parts else "",
+        "name_last": " ".join(name_parts[1:]) if len(name_parts) > 1 else "",
+        "email_address": customer["email"],
+        "m_payment_id": payment_id,
+        "amount": f"{total:.2f}",
+        "item_name": item_name[:100],
+        "item_description": item_desc[:255],
+        "custom_str1": customer["email"],
+        "custom_str2": customer.get("company", ""),
+        "custom_str3": "professional",
+        "custom_str4": customer["id"],
+        "custom_int1": str(qty),
+        "custom_int2": str(1 if cycle == "annual" else 0),
+    }
+    signature = generate_payfast_signature(data)
+    data["signature"] = signature
+    return {"form_fields": data, "payfast_url": PAYFAST_URL, "payment_id": payment_id}
+
+
+@app.post("/api/portal/activate-trial")
+async def portal_activate_trial(request: Request):
+    """Activate a 7-day trial from the portal (creates license + emails key)."""
+    customer = await get_portal_user(request)
+    email = customer["email"].lower()
+
+    # Check for existing trial
+    existing = supabase_client.table("portal_licenses").select("license_key").eq("customer_id", customer["id"]).eq("license_type", "trial").execute()
+    if existing.data:
+        return {"success": True, "message": "You already have a trial license. Check your email.", "existing": True}
+
+    # Also check JSON DB
+    for key, lic in LICENSE_DATABASE.items():
+        if lic.get('customer_email', '').lower() == email and lic.get('is_demo'):
+            # Sync to Supabase and re-send email
+            sync_license_to_supabase(email, customer.get('full_name', ''), customer.get('company', ''),
+                                     key, 'trial', 7, lic.get('expires', ''))
+            if SMTP_USER:
+                try:
+                    send_trial_email(email, key, lic.get('expires', '')[:10])
+                except Exception:
+                    pass
+            return {"success": True, "message": "Trial license re-sent to your email.", "existing": True}
+
+    # Generate new trial
+    license_key = generate_license_key()
+    expires = datetime.now() + timedelta(days=7)
+    expires_date = expires.strftime('%Y-%m-%d')
+
+    LICENSE_DATABASE[license_key] = {
+        'key': license_key,
+        'created_at': datetime.now().isoformat(),
+        'expires': expires.isoformat(),
+        'active': True,
+        'customer_email': email,
+        'hardware_id': None,
+        'duration_days': 7,
+        'is_demo': True,
+        'max_users': 1,
+        'payment': {
+            'method': 'trial',
+            'customer_name': customer.get('full_name', ''),
+            'company': customer.get('company', ''),
+            'completed_at': datetime.now().isoformat()
+        }
+    }
+    save_database()
+    sync_license_to_supabase(email, customer.get('full_name', ''), customer.get('company', ''),
+                              license_key, 'trial', 7, expires.isoformat())
+
+    if SMTP_USER:
+        try:
+            send_trial_email(email, license_key, expires_date)
+        except Exception as e:
+            print(f"[Portal Trial] Email error: {e}")
+
+    return {"success": True, "message": "Trial license created and emailed!"}
+
+
+@app.get("/api/admin/portal-users")
+async def admin_portal_users(request: Request):
+    """List all portal customers (admin only)."""
+    token = request.query_params.get("token", "")
+    if token != ADMIN_TOKEN:
+        raise HTTPException(401, "Unauthorized")
+    if not supabase_client:
+        return {"users": [], "error": "Supabase not configured"}
+    result = supabase_client.table("portal_customers").select("*").order("created_at", desc=True).execute()
+    # Get license counts per customer
+    users = []
+    for c in (result.data or []):
+        lics = supabase_client.table("portal_licenses").select("id").eq("customer_id", c["id"]).execute()
+        c["license_count"] = len(lics.data) if lics.data else 0
+        users.append(c)
+    return {"users": users}
+
+
+@app.post("/api/admin/portal-user/toggle")
+async def admin_toggle_portal_user(request: Request):
+    """Suspend or unsuspend a portal customer (admin only)."""
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(401, "Unauthorized")
+    if not supabase_client:
+        raise HTTPException(503, "Supabase not configured")
+    customer_id = body.get("customer_id")
+    action = body.get("action", "suspend")
+    is_suspended = action == "suspend"
+    supabase_client.table("portal_customers").update({"is_suspended": is_suspended}).eq("id", customer_id).execute()
+    return {"success": True, "suspended": is_suspended}
+
+
+@app.get("/api/admin/portal-user/licenses")
+async def admin_portal_user_licenses(request: Request):
+    """Get all licenses for a specific portal customer (admin only)."""
+    token = request.query_params.get("token", "")
+    if token != ADMIN_TOKEN:
+        raise HTTPException(401, "Unauthorized")
+    if not supabase_client:
+        return {"licenses": []}
+    customer_id = request.query_params.get("customer_id", "")
+    if not customer_id:
+        raise HTTPException(400, "customer_id required")
+    result = supabase_client.table("portal_licenses").select("*").eq("customer_id", customer_id).order("created_at", desc=True).execute()
+    return {"licenses": result.data or []}
+
+
+# ── SMTP Settings Admin API ──
+
+SMTP_SETTINGS_FILE = os.path.join(DATA_DIR, "smtp_settings.json")
+
+
+def load_smtp_settings():
+    """Load SMTP settings from file or return current defaults."""
+    if os.path.exists(SMTP_SETTINGS_FILE):
+        try:
+            with open(SMTP_SETTINGS_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "host": SMTP_HOST,
+        "port": SMTP_PORT,
+        "user": SMTP_USER,
+        "password": SMTP_PASS,
+        "from_email": FROM_EMAIL,
+        "from_name": FROM_NAME,
+    }
+
+
+def save_smtp_settings(settings: dict):
+    """Save SMTP settings to file and update runtime globals."""
+    global SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, FROM_EMAIL, FROM_NAME
+    with open(SMTP_SETTINGS_FILE, 'w') as f:
+        json.dump(settings, f, indent=2)
+    SMTP_HOST = settings.get("host", SMTP_HOST)
+    SMTP_PORT = int(settings.get("port", SMTP_PORT))
+    SMTP_USER = settings.get("user", SMTP_USER)
+    SMTP_PASS = settings.get("password", SMTP_PASS)
+    FROM_EMAIL = settings.get("from_email", FROM_EMAIL)
+    FROM_NAME = settings.get("from_name", FROM_NAME)
+
+
+# Apply saved SMTP settings on startup
+_saved_smtp = load_smtp_settings()
+if os.path.exists(SMTP_SETTINGS_FILE):
+    save_smtp_settings(_saved_smtp)
+
+
+@app.get("/api/admin/smtp-settings")
+async def admin_get_smtp(request: Request):
+    """Get current SMTP settings (admin only)."""
+    token = request.query_params.get("token", "")
+    if token != ADMIN_TOKEN:
+        raise HTTPException(401, "Unauthorized")
+    settings = load_smtp_settings()
+    # Mask password for display
+    masked = {**settings, "password": "••••••••" if settings.get("password") else ""}
+    return {"settings": masked}
+
+
+@app.post("/api/admin/smtp-settings")
+async def admin_update_smtp(request: Request):
+    """Update SMTP settings (admin only)."""
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(401, "Unauthorized")
+    current = load_smtp_settings()
+    new_settings = {
+        "host": body.get("host", current["host"]),
+        "port": int(body.get("port", current["port"])),
+        "user": body.get("user", current["user"]),
+        "password": body.get("password", current["password"]) if body.get("password") and body["password"] != "••••••••" else current["password"],
+        "from_email": body.get("from_email", current["from_email"]),
+        "from_name": body.get("from_name", current["from_name"]),
+    }
+    save_smtp_settings(new_settings)
+    return {"success": True, "message": "SMTP settings updated"}
+
+
+@app.post("/api/admin/smtp-test")
+async def admin_test_smtp(request: Request):
+    """Send a test email using current SMTP settings (admin only)."""
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(401, "Unauthorized")
+    test_email = body.get("email", SUPPORT_EMAIL)
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f'SMTP Test - {COMPANY_NAME} License Server'
+        msg['From'] = f'{FROM_NAME} <{FROM_EMAIL}>'
+        msg['To'] = test_email
+        msg.attach(MIMEText(f'<div style="font-family:Arial;padding:20px;"><h2>SMTP Test Successful!</h2><p>This email confirms your SMTP settings are working correctly.</p><p>Server: {SMTP_HOST}:{SMTP_PORT}</p><p>From: {FROM_EMAIL}</p></div>', 'html'))
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(FROM_EMAIL, test_email, msg.as_string())
+        return {"success": True, "message": f"Test email sent to {test_email}"}
+    except Exception as e:
+        return {"success": False, "message": f"SMTP error: {str(e)}"}
+
+
+# ── Admin User Management API ──
+
+ADMINS_FILE = os.path.join(DATA_DIR, "admin_users.json")
+
+
+def load_admin_users():
+    """Load admin users from file."""
+    if os.path.exists(ADMINS_FILE):
+        try:
+            with open(ADMINS_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return [{"id": "1", "email": SUPPORT_EMAIL, "name": "Primary Admin", "role": "super", "created_at": datetime.now().isoformat()}]
+
+
+def save_admin_users(users: list):
+    """Save admin users to file."""
+    with open(ADMINS_FILE, 'w') as f:
+        json.dump(users, f, indent=2)
+
+
+@app.get("/api/admin/admins")
+async def admin_list_admins(request: Request):
+    """List all admin users."""
+    token = request.query_params.get("token", "")
+    if token != ADMIN_TOKEN:
+        raise HTTPException(401, "Unauthorized")
+    return {"admins": load_admin_users()}
+
+
+@app.post("/api/admin/admins/add")
+async def admin_add_admin(request: Request):
+    """Add a new admin user."""
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(401, "Unauthorized")
+    admins = load_admin_users()
+    new_admin = {
+        "id": str(len(admins) + 1),
+        "email": body.get("email", ""),
+        "name": body.get("name", ""),
+        "role": body.get("role", "admin"),
+        "created_at": datetime.now().isoformat()
+    }
+    if not new_admin["email"]:
+        raise HTTPException(400, "Email is required")
+    # Check for duplicate
+    if any(a["email"].lower() == new_admin["email"].lower() for a in admins):
+        raise HTTPException(400, "Admin with this email already exists")
+    admins.append(new_admin)
+    save_admin_users(admins)
+    return {"success": True, "admin": new_admin}
+
+
+@app.post("/api/admin/admins/remove")
+async def admin_remove_admin(request: Request):
+    """Remove an admin user (cannot remove super admin)."""
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(401, "Unauthorized")
+    admin_id = body.get("admin_id", "")
+    admins = load_admin_users()
+    admin_to_remove = next((a for a in admins if a["id"] == admin_id), None)
+    if not admin_to_remove:
+        raise HTTPException(404, "Admin not found")
+    if admin_to_remove.get("role") == "super":
+        raise HTTPException(400, "Cannot remove the primary super admin")
+    admins = [a for a in admins if a["id"] != admin_id]
+    save_admin_users(admins)
+    return {"success": True}
 
 
 @app.get("/api/payfast/return", response_class=HTMLResponse)
@@ -900,396 +1486,6 @@ async def edit_license(request: EditLicenseRequest):
     return {"success": True, "message": f"License updated ({', '.join(changes)})", "license": lic}
 
 
-# ══════════════════════════════════════════════════════════════════
-#   ADMIN DASHBOARD (Web UI)
-# ══════════════════════════════════════════════════════════════════
-
-ADMIN_HTML = """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connexa License Admin</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        * { font-family: 'Inter', sans-serif; }
-        body { background: #0f172a; color: #e2e8f0; }
-        .glass { background: rgba(30,41,59,0.7); backdrop-filter: blur(12px); border: 1px solid rgba(71,85,105,0.3); }
-        .status-active { background: #059669; }
-        .status-expired { background: #dc2626; }
-        .status-inactive { background: #d97706; }
-        .modal-bg { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
-        input, select { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; }
-        input:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
-    </style>
-</head>
-<body class="min-h-screen">
-    <!-- Header -->
-    <header class="border-b border-slate-700/50 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center font-bold text-white">C</div>
-                <div>
-                    <h1 class="text-lg font-bold text-white">Connexa License Admin</h1>
-                    <p class="text-xs text-slate-500">Connexify (Pty) Ltd</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-3">
-                <div id="stats-bar" class="hidden md:flex items-center gap-4 text-xs text-slate-400 mr-4"></div>
-                <a href="/" class="text-xs text-slate-400 hover:text-white transition">&larr; Back to Website</a>
-            </div>
-        </div>
-    </header>
-
-    <div class="max-w-7xl mx-auto px-6 py-8">
-        <!-- Login -->
-        <div id="login-section">
-            <div class="max-w-md mx-auto mt-20">
-                <div class="glass rounded-2xl p-8">
-                    <h2 class="text-xl font-bold text-white mb-6 text-center">Admin Login</h2>
-                    <div class="space-y-4">
-                        <input id="token-input" type="password" placeholder="Admin Token" class="w-full px-4 py-3 rounded-lg text-sm">
-                        <button onclick="login()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-medium transition">Sign In</button>
-                        <p id="login-error" class="text-red-400 text-sm text-center hidden"></p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Dashboard (hidden until login) -->
-        <div id="dashboard-section" class="hidden">
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <div class="glass rounded-xl p-5">
-                    <p class="text-sm text-slate-400 mb-1">Total Licenses</p>
-                    <p id="stat-total" class="text-3xl font-bold text-white">-</p>
-                </div>
-                <div class="glass rounded-xl p-5">
-                    <p class="text-sm text-slate-400 mb-1">Active</p>
-                    <p id="stat-active" class="text-3xl font-bold text-green-400">-</p>
-                </div>
-                <div class="glass rounded-xl p-5">
-                    <p class="text-sm text-slate-400 mb-1">Bound to HW</p>
-                    <p id="stat-bound" class="text-3xl font-bold text-cyan-400">-</p>
-                </div>
-                <div class="glass rounded-xl p-5">
-                    <p class="text-sm text-slate-400 mb-1">Expired</p>
-                    <p id="stat-expired" class="text-3xl font-bold text-red-400">-</p>
-                </div>
-            </div>
-
-            <!-- Actions Bar -->
-            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-                <h2 class="text-xl font-bold text-white">Licenses</h2>
-                <div class="flex gap-3">
-                    <button onclick="showCreateModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition flex items-center gap-2">
-                        <span class="text-lg">+</span> Create License
-                    </button>
-                    <button onclick="loadLicenses()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition">
-                        &#8635; Refresh
-                    </button>
-                </div>
-            </div>
-
-            <!-- License Table -->
-            <div class="glass rounded-xl overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="border-b border-slate-700/50 text-left text-slate-400">
-                                <th class="px-5 py-3 font-medium">License Key</th>
-                                <th class="px-5 py-3 font-medium">Customer</th>
-                                <th class="px-5 py-3 font-medium">Status</th>
-                                <th class="px-5 py-3 font-medium">Expires</th>
-                                <th class="px-5 py-3 font-medium">Hardware</th>
-                                <th class="px-5 py-3 font-medium text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="license-table-body">
-                            <tr><td colspan="6" class="px-5 py-10 text-center text-slate-500">Loading...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Create License Modal -->
-    <div id="create-modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-bg">
-        <div class="glass rounded-2xl p-8 w-full max-w-md mx-4">
-            <h3 class="text-lg font-bold text-white mb-6">Create New License</h3>
-            <div class="space-y-4">
-                <div>
-                    <label class="text-xs text-slate-400 block mb-1">Customer Email</label>
-                    <input id="create-email" type="email" placeholder="customer@example.com" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                </div>
-                <div>
-                    <label class="text-xs text-slate-400 block mb-1">Duration (days)</label>
-                    <input id="create-days" type="number" value="365" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                </div>
-                <div class="flex items-center gap-2">
-                    <input id="create-demo" type="checkbox" class="w-4 h-4 rounded">
-                    <label class="text-sm text-slate-400">Demo / Trial license</label>
-                </div>
-                <div class="flex gap-3 mt-6">
-                    <button onclick="createLicense()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-sm font-medium transition">Create</button>
-                    <button onclick="closeModal('create-modal')" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-sm font-medium transition">Cancel</button>
-                </div>
-                <p id="create-result" class="text-sm text-center hidden"></p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit License Modal -->
-    <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-bg">
-        <div class="glass rounded-2xl p-8 w-full max-w-md mx-4">
-            <h3 class="text-lg font-bold text-white mb-2">Edit License</h3>
-            <p id="edit-key-display" class="text-xs text-cyan-400 font-mono mb-6"></p>
-            <div class="space-y-4">
-                <div>
-                    <label class="text-xs text-slate-400 block mb-1">Customer Email</label>
-                    <input id="edit-email" type="email" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                </div>
-                <div>
-                    <label class="text-xs text-slate-400 block mb-1">Expires (YYYY-MM-DD)</label>
-                    <input id="edit-expires" type="date" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                </div>
-                <div>
-                    <label class="text-xs text-slate-400 block mb-1">Status</label>
-                    <select id="edit-active" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                        <option value="true">Active</option>
-                        <option value="false">Inactive</option>
-                    </select>
-                </div>
-                <div class="flex items-center gap-2">
-                    <input id="edit-unbind" type="checkbox" class="w-4 h-4 rounded">
-                    <label class="text-sm text-slate-400">Unbind from hardware (allow re-activation)</label>
-                </div>
-                <div class="flex gap-3 mt-6">
-                    <button onclick="saveEdit()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-sm font-medium transition">Save</button>
-                    <button onclick="closeModal('edit-modal')" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-sm font-medium transition">Cancel</button>
-                </div>
-                <p id="edit-result" class="text-sm text-center hidden"></p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast -->
-    <div id="toast" class="fixed bottom-6 right-6 bg-green-600 text-white px-6 py-3 rounded-xl shadow-lg text-sm font-medium transform translate-y-20 opacity-0 transition-all duration-300 z-50"></div>
-
-    <script>
-        let TOKEN = '';
-        const BASE = window.location.origin;
-
-        // ── Auth ──
-        document.getElementById('token-input').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
-
-        async function login() {
-            TOKEN = document.getElementById('token-input').value.trim();
-            if (!TOKEN) return;
-            try {
-                const r = await fetch(`${BASE}/api/admin/stats?admin_token=${encodeURIComponent(TOKEN)}`);
-                if (!r.ok) throw new Error('Invalid token');
-                document.getElementById('login-section').classList.add('hidden');
-                document.getElementById('dashboard-section').classList.remove('hidden');
-                loadLicenses();
-                loadStats();
-            } catch (e) {
-                const el = document.getElementById('login-error');
-                el.textContent = 'Invalid admin token';
-                el.classList.remove('hidden');
-            }
-        }
-
-        // ── Load Data ──
-        async function loadStats() {
-            const r = await fetch(`${BASE}/api/admin/stats?admin_token=${encodeURIComponent(TOKEN)}`);
-            const d = await r.json();
-            document.getElementById('stat-total').textContent = d.total_licenses;
-            document.getElementById('stat-active').textContent = d.active_licenses;
-            document.getElementById('stat-bound').textContent = d.bound_licenses;
-            document.getElementById('stat-expired').textContent = d.expired_licenses;
-        }
-
-        async function loadLicenses() {
-            const r = await fetch(`${BASE}/api/admin/list-licenses?admin_token=${encodeURIComponent(TOKEN)}`);
-            const d = await r.json();
-            const tbody = document.getElementById('license-table-body');
-            
-            if (!d.licenses || d.licenses.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-10 text-center text-slate-500">No licenses found</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = d.licenses.map(lic => {
-                const isExpired = new Date(lic.expires) < new Date();
-                const isActive = lic.active && !isExpired;
-                const statusClass = isExpired ? 'status-expired' : (lic.active ? 'status-active' : 'status-inactive');
-                const statusText = isExpired ? 'Expired' : (lic.active ? 'Active' : 'Inactive');
-                const expDate = lic.expires ? lic.expires.substring(0, 10) : 'N/A';
-                const hwBound = lic.hardware_id ? '&#128274; Bound' : '&#128275; Unbound';
-                const hwClass = lic.hardware_id ? 'text-cyan-400' : 'text-slate-500';
-                const email = lic.customer_email || '<span class="text-slate-600 italic">none</span>';
-                const demoTag = lic.is_demo ? '<span class="ml-2 text-[10px] bg-yellow-600/20 text-yellow-400 px-1.5 py-0.5 rounded">DEMO</span>' : '';
-
-                return `<tr class="border-b border-slate-700/30 hover:bg-slate-800/30 transition">
-                    <td class="px-5 py-3">
-                        <span class="font-mono text-xs text-cyan-300">${lic.key}</span>${demoTag}
-                    </td>
-                    <td class="px-5 py-3 text-xs">${email}</td>
-                    <td class="px-5 py-3">
-                        <span class="inline-flex items-center gap-1.5 text-xs">
-                            <span class="w-2 h-2 rounded-full ${statusClass}"></span>
-                            ${statusText}
-                        </span>
-                    </td>
-                    <td class="px-5 py-3 text-xs ${isExpired ? 'text-red-400' : 'text-slate-300'}">${expDate}</td>
-                    <td class="px-5 py-3 text-xs ${hwClass}">${hwBound}</td>
-                    <td class="px-5 py-3 text-right">
-                        <div class="flex items-center justify-end gap-1">
-                            <button onclick="showEditModal('${lic.key}')" class="px-2.5 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-xs text-white transition" title="Edit">&#9998;</button>
-                            ${lic.hardware_id ? `<button onclick="unbindLicense('${lic.key}')" class="px-2.5 py-1.5 rounded-md bg-orange-700/50 hover:bg-orange-600/50 text-xs text-orange-300 transition" title="Unbind HW">&#128275;</button>` : ''}
-                            ${!lic.is_demo ? `<button onclick="deleteLicense('${lic.key}')" class="px-2.5 py-1.5 rounded-md bg-red-700/50 hover:bg-red-600/50 text-xs text-red-300 transition" title="Delete">&#128465;</button>` : ''}
-                        </div>
-                    </td>
-                </tr>`;
-            }).join('');
-
-            loadStats();
-        }
-
-        // ── Create License ──
-        function showCreateModal() {
-            document.getElementById('create-email').value = '';
-            document.getElementById('create-days').value = '365';
-            document.getElementById('create-demo').checked = false;
-            document.getElementById('create-result').classList.add('hidden');
-            document.getElementById('create-modal').classList.remove('hidden');
-            document.getElementById('create-modal').classList.add('flex');
-        }
-
-        async function createLicense() {
-            const email = document.getElementById('create-email').value.trim();
-            const days = parseInt(document.getElementById('create-days').value) || 365;
-            const isDemo = document.getElementById('create-demo').checked;
-
-            const r = await fetch(`${BASE}/api/admin/create-license`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ admin_token: TOKEN, customer_email: email, duration_days: days, is_demo: isDemo })
-            });
-            const d = await r.json();
-            
-            if (d.license_key) {
-                closeModal('create-modal');
-                showToast(`License created: ${d.license_key}`);
-                loadLicenses();
-            } else {
-                const el = document.getElementById('create-result');
-                el.textContent = d.detail || 'Error creating license';
-                el.className = 'text-sm text-center text-red-400';
-                el.classList.remove('hidden');
-            }
-        }
-
-        // ── Edit License ──
-        let editingKey = '';
-
-        function showEditModal(key) {
-            editingKey = key;
-            // Find license data from the table (re-fetch to be safe)
-            fetch(`${BASE}/api/admin/list-licenses?admin_token=${encodeURIComponent(TOKEN)}`)
-                .then(r => r.json())
-                .then(d => {
-                    const lic = d.licenses.find(l => l.key === key);
-                    if (!lic) return;
-                    document.getElementById('edit-key-display').textContent = key;
-                    document.getElementById('edit-email').value = lic.customer_email || '';
-                    document.getElementById('edit-expires').value = lic.expires ? lic.expires.substring(0, 10) : '';
-                    document.getElementById('edit-active').value = lic.active ? 'true' : 'false';
-                    document.getElementById('edit-unbind').checked = false;
-                    document.getElementById('edit-result').classList.add('hidden');
-                    document.getElementById('edit-modal').classList.remove('hidden');
-                    document.getElementById('edit-modal').classList.add('flex');
-                });
-        }
-
-        async function saveEdit() {
-            const body = {
-                admin_token: TOKEN,
-                license_key: editingKey,
-                customer_email: document.getElementById('edit-email').value.trim(),
-                expires: document.getElementById('edit-expires').value + 'T23:59:59',
-                active: document.getElementById('edit-active').value === 'true'
-            };
-            if (document.getElementById('edit-unbind').checked) {
-                body.hardware_id = '';
-            }
-
-            const r = await fetch(`${BASE}/api/admin/edit-license`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(body)
-            });
-            const d = await r.json();
-            
-            if (d.success) {
-                closeModal('edit-modal');
-                showToast('License updated');
-                loadLicenses();
-            } else {
-                const el = document.getElementById('edit-result');
-                el.textContent = d.detail || 'Error updating license';
-                el.className = 'text-sm text-center text-red-400';
-                el.classList.remove('hidden');
-            }
-        }
-
-        // ── Unbind ──
-        async function unbindLicense(key) {
-            if (!confirm(`Unbind hardware from license ${key}?\\nThis will allow re-activation on a new machine.`)) return;
-            const r = await fetch(`${BASE}/api/admin/edit-license`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ admin_token: TOKEN, license_key: key, hardware_id: '' })
-            });
-            const d = await r.json();
-            if (d.success) { showToast('Hardware unbound'); loadLicenses(); }
-        }
-
-        // ── Delete ──
-        async function deleteLicense(key) {
-            if (!confirm(`DELETE license ${key}?\\n\\nThis cannot be undone!`)) return;
-            const r = await fetch(`${BASE}/api/admin/delete-license`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ admin_token: TOKEN, license_key: key })
-            });
-            const d = await r.json();
-            if (d.success) { showToast('License deleted'); loadLicenses(); }
-        }
-
-        // ── Helpers ──
-        function closeModal(id) {
-            document.getElementById(id).classList.add('hidden');
-            document.getElementById(id).classList.remove('flex');
-        }
-
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => t.classList.add('translate-y-20', 'opacity-0'), 3000);
-        }
-
-        // Close modals on bg click
-        document.querySelectorAll('.modal-bg').forEach(el => {
-            el.addEventListener('click', e => { if (e.target === el) closeModal(el.id); });
-        });
-    </script>
-</body>
-</html>"""
 
 
 @app.get("/admin", response_class=HTMLResponse)

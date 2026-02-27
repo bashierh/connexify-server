@@ -53,7 +53,8 @@ _NAV = """<nav class="fixed top-0 w-full z-50 bg-gray-950/80 backdrop-blur-lg bo
 <a href="/#contact" class="hover:text-white transition-colors no-underline">Contact</a>
 </div>
 <div class="flex items-center gap-3">
-<a href="/get-started" class="hidden sm:inline-block glow-btn px-5 py-2 rounded-lg text-white text-sm font-medium no-underline">Get Started</a>
+<a href="/portal" class="hidden sm:inline-block text-sm text-gray-400 hover:text-white transition no-underline">My Account</a>
+<a href="/get-started" class="hidden sm:inline-block glow-btn px-5 py-2 rounded-lg text-white text-sm font-medium no-underline">Get Started</a>Get Started</a>
 <button id="mob-btn" class="lg:hidden text-gray-400 hover:text-white p-2" aria-label="Menu">
 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
 </button>
@@ -68,6 +69,7 @@ _NAV = """<nav class="fixed top-0 w-full z-50 bg-gray-950/80 backdrop-blur-lg bo
 <a href="/#faq" class="block text-gray-400 hover:text-white py-2 no-underline">FAQ</a>
 <a href="/#contact" class="block text-gray-400 hover:text-white py-2 no-underline">Contact</a>
 <a href="/get-started" class="block glow-btn text-white text-center py-2.5 rounded-lg font-medium mt-2 no-underline">Get Started</a>
+<a href="/portal" class="block text-gray-400 hover:text-white text-center py-2 no-underline">My Account</a>
 </div>
 </div>
 </nav>"""
@@ -707,6 +709,11 @@ GET_STARTED_TEMPLATE = """<!DOCTYPE html>
 <label class="text-xs text-gray-400 block mb-1.5">Company Name</label>
 <input id="gs-company" type="text" class="w-full bg-gray-900/80 border border-gray-700 text-white px-4 py-2.5 rounded-lg text-sm focus:border-blue-500 outline-none transition">
 </div>
+<div id="password-field" class="hidden">
+<label class="text-xs text-gray-400 block mb-1.5">Portal Password *</label>
+<input id="gs-password" type="password" placeholder="Min 6 characters" class="w-full bg-gray-900/80 border border-gray-700 text-white px-4 py-2.5 rounded-lg text-sm focus:border-blue-500 outline-none transition">
+<p class="text-[11px] text-gray-500 mt-1">Create a password to access your customer portal after signup.</p>
+</div>
 <div>
 <label class="text-xs text-gray-400 block mb-1.5">Number of Devices (approx)</label>
 <select id="gs-devices" class="w-full bg-gray-900/80 border border-gray-700 text-white px-4 py-2.5 rounded-lg text-sm focus:border-blue-500 outline-none transition">
@@ -967,6 +974,9 @@ function selectPlan(plan){
   selectedPlan=plan;
   document.querySelectorAll('.plan-card').forEach(c=>{c.style.borderColor=c.dataset.plan===plan?'#3b82f6':'rgba(71,85,105,0.3)'});
   const btn=document.getElementById('btn-next-1');btn.style.opacity='1';btn.style.pointerEvents='auto';
+  // Show password field for trial (portal access) and professional plans
+  const pwField=document.getElementById('password-field');
+  if(pwField){pwField.classList.remove('hidden')}
 }
 
 function selectPayment(method){
@@ -992,7 +1002,14 @@ function selectPayment(method){
 }
 
 function nextStep(n){
+  // Validate Step 2 fields before proceeding to Step 3
   if(n===3){
+    const email=document.getElementById('gs-email')?.value?.trim();
+    const name=document.getElementById('gs-name')?.value?.trim();
+    if(!name){alert('Please enter your full name.');return}
+    if(!email){alert('Please enter your email address.');return}
+    const pw=document.getElementById('gs-password')?.value||'';
+    if(selectedPlan!=='enterprise' && pw.length>0 && pw.length<6){alert('Password must be at least 6 characters.');return}
     document.getElementById('pay-trial').classList.add('hidden');
     document.getElementById('pay-professional').classList.add('hidden');
     document.getElementById('pay-enterprise').classList.add('hidden');
@@ -1075,7 +1092,9 @@ async function activateTrial(){
   const name=document.getElementById('gs-name')?.value||'';
   const email=document.getElementById('gs-email')?.value||'';
   const company=document.getElementById('gs-company')?.value||'';
+  const password=document.getElementById('gs-password')?.value||'';
   if(!email){alert('Please go back to Step 2 and enter your email address.');return}
+  if(!password || password.length<6){alert('Please go back to Step 2 and set a portal password (min 6 characters). This lets you manage your license online.');return}
 
   const btn=document.getElementById('btn-activate-trial');
   const status=document.getElementById('trial-status');
@@ -1084,16 +1103,17 @@ async function activateTrial(){
   btn.style.opacity='0.5';
 
   try{
-    const res=await fetch('/api/trial/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,company})});
+    const res=await fetch('/api/trial/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,company,password})});
     const data=await res.json();
     if(data.success){
       status.className='mb-4 p-3 rounded-lg text-sm bg-green-500/10 border border-green-500/30 text-green-400';
-      status.innerHTML='&#10003; '+data.message+' Check your inbox (and spam folder).';
+      const portalMsg=password?'<br><strong>Portal account created!</strong> Log in at <a href="/portal" style="color:#60a5fa;text-decoration:underline">/portal</a> with your email &amp; password.':'';
+      status.innerHTML='&#10003; '+data.message+' Check your inbox (and spam folder).'+portalMsg;
       status.classList.remove('hidden');
       btn.textContent='Trial Activated!';
       btn.style.background='#22c55e';
       // Auto-advance after short delay
-      setTimeout(()=>nextStep(4),2000);
+      setTimeout(()=>nextStep(4),3000);
     }else{
       status.className='mb-4 p-3 rounded-lg text-sm bg-red-500/10 border border-red-500/30 text-red-400';
       status.textContent=data.detail||'Something went wrong. Please try again.';

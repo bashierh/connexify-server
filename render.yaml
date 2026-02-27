@@ -27,6 +27,12 @@ services:
         value: "5.2.8"
       - key: LICENSE_DB_FILE
         value: /opt/render/project/data/license_database.json
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
     disk:
       name: license-data
       mountPath: /opt/render/project/data
