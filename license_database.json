@@ -21,7 +21,23 @@
       "duration_days": 365,
       "is_demo": false,
       "max_users": 1
+    },
+    "P6PP9-JMNZ7-7Y675-MAF7U-4R38G": {
+      "key": "P6PP9-JMNZ7-7Y675-MAF7U-4R38G",
+      "created_at": "2025-12-09T17:03:03.112611",
+      "expires": "2026-12-15T17:03:03.112611",
+      "active": true,
+      "customer_email": "jacques@wheeler.co.za",
+      "hardware_id": "5a862327db38c12bc9bf88fbb18f47d7dc9ce1e9dd5da65b2c12699f3f6f3849",
+      "duration_days": 365,
+      "is_demo": false,
+      "max_users": 1
     }
   },
-  "activations": {}
+  "activations": {
+    "P6PP9-JMNZ7-7Y675-MAF7U-4R38G": {
+      "hardware_id": "5a862327db38c12bc9bf88fbb18f47d7dc9ce1e9dd5da65b2c12699f3f6f3849",
+      "activated_at": "2025-12-09T17:15:58.562000"
+    }
+  }
 }

@@ -158,6 +158,15 @@ class ResendEmailRequest(BaseModel):
     admin_token: str
     customer_email: str = ""
 
+class ImportLicenseRequest(BaseModel):
+    admin_token: str
+    license_key: str
+    expires: str
+    customer_email: str = ""
+    hardware_id: Optional[str] = None
+    duration_days: int = 365
+    is_demo: bool = False
+
 
 # ── Startup ──
 
@@ -569,6 +578,32 @@ async def create_license(request: CreateLicenseRequest):
             email_error = str(e)
     
     return {"license_key": license_key, "expires": expires.isoformat(), "message": "License created", "email_sent": email_sent, "email_error": email_error}
+
+
+@app.post("/api/admin/import-license")
+async def import_license(request: ImportLicenseRequest):
+    """Import an existing license (e.g. from old server)"""
+    if request.admin_token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    LICENSE_DATABASE[request.license_key] = {
+        'key': request.license_key,
+        'created_at': datetime.now().isoformat(),
+        'expires': request.expires,
+        'active': True,
+        'customer_email': request.customer_email,
+        'hardware_id': request.hardware_id,
+        'duration_days': request.duration_days,
+        'is_demo': request.is_demo,
+        'max_users': -1 if request.is_demo else 1
+    }
+    if request.hardware_id:
+        ACTIVATIONS_DB[request.license_key] = {
+            'hardware_id': request.hardware_id,
+            'activated_at': datetime.now().isoformat()
+        }
+    save_database()
+    return {"success": True, "message": f"License {request.license_key} imported", "expires": request.expires}
 
 
 @app.get("/api/admin/list-licenses")
