@@ -1,0 +1,16 @@
+.git
+.gitignore
+*.deb
+*.exe
+*.AppImage
+*.dmg
+__pycache__
+*.pyc
+*.md
+render.yaml
+deploy-gcp.sh
+deploy-gcp.ps1
+migrate-to-gcs.ps1
+migration-data/
+license_database.json
+portal_users.json

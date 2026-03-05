@@ -54,7 +54,7 @@ _NAV = """<nav class="fixed top-0 w-full z-50 bg-gray-950/80 backdrop-blur-lg bo
 </div>
 <div class="flex items-center gap-3">
 <a href="/portal" class="hidden sm:inline-block text-sm text-gray-400 hover:text-white transition no-underline">My Account</a>
-<a href="/get-started" class="hidden sm:inline-block glow-btn px-5 py-2 rounded-lg text-white text-sm font-medium no-underline">Get Started</a>Get Started</a>
+<a href="/get-started" class="hidden sm:inline-block glow-btn px-5 py-2 rounded-lg text-white text-sm font-medium no-underline">Get Started</a>
 <button id="mob-btn" class="lg:hidden text-gray-400 hover:text-white p-2" aria-label="Menu">
 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
 </button>
@@ -738,7 +738,13 @@ GET_STARTED_TEMPLATE = """<!DOCTYPE html>
 <p class="text-gray-400 text-sm mb-4">Your 7-day trial is completely free. No credit card needed.</p>
 <p class="text-gray-400 text-sm mb-6">Click below to generate your trial license key &mdash; it will be emailed to you instantly.</p>
 <div id="trial-status" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
-<button id="btn-activate-trial" onclick="activateTrial()" class="glow-btn px-8 py-2.5 rounded-lg text-white text-sm font-medium">Activate Free Trial &rarr;</button>
+<!-- Verification code input (hidden initially) -->
+<div id="verification-step" class="hidden mb-4">
+<label class="text-xs text-gray-400 block mb-2">Enter the 6-digit code sent to your email:</label>
+<input id="gs-verification-code" type="text" maxlength="6" pattern="[0-9]{6}" class="w-full bg-gray-900/80 border border-gray-700 text-white px-4 py-3 rounded-lg text-center text-2xl tracking-widest font-mono outline-none focus:border-blue-500 transition" placeholder="000000">
+</div>
+<button id="btn-send-code" onclick="sendVerificationCode()" class="glow-btn px-8 py-2.5 rounded-lg text-white text-sm font-medium">Send Verification Code &rarr;</button>
+<button id="btn-activate-trial" onclick="activateTrial()" class="glow-btn px-8 py-2.5 rounded-lg text-white text-sm font-medium hidden">Activate Free Trial &rarr;</button>
 </div>
 
 <!-- Enterprise: contact us -->
@@ -1088,7 +1094,7 @@ async function submitPayment(){
   }catch(e){}
   nextStep(4);
 }
-async function activateTrial(){
+async function sendVerificationCode(){
   const name=document.getElementById('gs-name')?.value||'';
   const email=document.getElementById('gs-email')?.value||'';
   const company=document.getElementById('gs-company')?.value||'';
@@ -1096,14 +1102,53 @@ async function activateTrial(){
   if(!email){alert('Please go back to Step 2 and enter your email address.');return}
   if(!password || password.length<6){alert('Please go back to Step 2 and set a portal password (min 6 characters). This lets you manage your license online.');return}
 
+  const btn=document.getElementById('btn-send-code');
+  const status=document.getElementById('trial-status');
+  btn.disabled=true;btn.textContent='Sending...';btn.style.opacity='0.5';
+
+  try{
+    const res=await fetch('/api/trial/send-verification',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,name,company,password})});
+    const data=await res.json();
+    if(data.success){
+      status.className='mb-4 p-3 rounded-lg text-sm bg-green-500/10 border border-green-500/30 text-green-400';
+      status.textContent='\u2713 '+data.message;
+      status.classList.remove('hidden');
+      // Show verification code input and activate button
+      document.getElementById('verification-step').classList.remove('hidden');
+      document.getElementById('btn-activate-trial').classList.remove('hidden');
+      btn.textContent='Resend Code';btn.disabled=false;btn.style.opacity='1';
+      document.getElementById('gs-verification-code').focus();
+    }else{
+      status.className='mb-4 p-3 rounded-lg text-sm bg-red-500/10 border border-red-500/30 text-red-400';
+      status.textContent=data.detail||'Something went wrong. Please try again.';
+      status.classList.remove('hidden');
+      btn.disabled=false;btn.textContent='Send Verification Code \u2192';btn.style.opacity='1';
+    }
+  }catch(e){
+    status.className='mb-4 p-3 rounded-lg text-sm bg-red-500/10 border border-red-500/30 text-red-400';
+    status.textContent='Connection error. Please try again.';
+    status.classList.remove('hidden');
+    btn.disabled=false;btn.textContent='Send Verification Code \u2192';btn.style.opacity='1';
+  }
+}
+async function activateTrial(){
+  const name=document.getElementById('gs-name')?.value||'';
+  const email=document.getElementById('gs-email')?.value||'';
+  const company=document.getElementById('gs-company')?.value||'';
+  const password=document.getElementById('gs-password')?.value||'';
+  const verificationCode=document.getElementById('gs-verification-code')?.value||'';
+  if(!email){alert('Please go back to Step 2 and enter your email address.');return}
+  if(!password || password.length<6){alert('Please go back to Step 2 and set a portal password (min 6 characters). This lets you manage your license online.');return}
+  if(!verificationCode || verificationCode.length!==6){alert('Please enter the 6-digit verification code sent to your email.');return}
+
   const btn=document.getElementById('btn-activate-trial');
   const status=document.getElementById('trial-status');
   btn.disabled=true;
-  btn.textContent='Generating...';
+  btn.textContent='Activating...';
   btn.style.opacity='0.5';
 
   try{
-    const res=await fetch('/api/trial/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,company,password})});
+    const res=await fetch('/api/trial/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,company,password,verification_code:verificationCode})});
     const data=await res.json();
     if(data.success){
       status.className='mb-4 p-3 rounded-lg text-sm bg-green-500/10 border border-green-500/30 text-green-400';
@@ -1112,6 +1157,8 @@ async function activateTrial(){
       status.classList.remove('hidden');
       btn.textContent='Trial Activated!';
       btn.style.background='#22c55e';
+      document.getElementById('btn-send-code').style.display='none';
+      document.getElementById('verification-step').style.display='none';
       // Auto-advance after short delay
       setTimeout(()=>nextStep(4),3000);
     }else{

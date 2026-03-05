@@ -137,10 +137,10 @@ Already have an account? <a onclick="showAuthView('login')" class="text-blue-400
 <a class="sidebar-link active" data-tab="overview" onclick="switchTab('overview')">&#128202; Overview</a>
 <a class="sidebar-link" data-tab="licenses" onclick="switchTab('licenses')">&#128273; My Licenses</a>
 <a class="sidebar-link" data-tab="subscription" onclick="switchTab('subscription')">&#128179; Subscription</a>
+<a class="sidebar-link" data-tab="downloads" onclick="switchTab('downloads')">&#11015; Downloads</a>
 <a class="sidebar-link" data-tab="profile" onclick="switchTab('profile')">&#128100; Profile</a>
 </nav>
 <div class="mt-8 pt-4 border-t border-gray-800/50">
-<a href="/#downloads" class="sidebar-link text-gray-500 no-underline">&#11015; Download App</a>
 <a href="mailto:__EMAIL__" class="sidebar-link text-gray-500 no-underline">&#128172; Support</a>
 </div></aside>
 
@@ -149,6 +149,7 @@ Already have an account? <a onclick="showAuthView('login')" class="text-blue-400
 <button class="mob-tab px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap bg-blue-500/10 text-blue-400" data-tab="overview" onclick="switchTab('overview')">Overview</button>
 <button class="mob-tab px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap text-gray-400" data-tab="licenses" onclick="switchTab('licenses')">Licenses</button>
 <button class="mob-tab px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap text-gray-400" data-tab="subscription" onclick="switchTab('subscription')">Plans</button>
+<button class="mob-tab px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap text-gray-400" data-tab="downloads" onclick="switchTab('downloads')">Downloads</button>
 <button class="mob-tab px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap text-gray-400" data-tab="profile" onclick="switchTab('profile')">Profile</button>
 </div>
 
@@ -177,10 +178,10 @@ Already have an account? <a onclick="showAuthView('login')" class="text-blue-400
 <div class="text-2xl mb-2">&#128273;</div>
 <p class="text-white font-medium text-sm">View Licenses</p>
 <p class="text-gray-500 text-xs">See keys &amp; hardware bindings</p></button>
-<a href="/#downloads" class="glass rounded-xl p-5 text-left hover:border-blue-500/50 transition no-underline block">
+<button onclick="switchTab('downloads')" class="glass rounded-xl p-5 text-left hover:border-blue-500/50 transition">
 <div class="text-2xl mb-2">&#11015;</div>
 <p class="text-white font-medium text-sm">Download Connexa</p>
-<p class="text-gray-500 text-xs">Get the latest installer</p></a>
+<p class="text-gray-500 text-xs">Get the latest installer</p></button>
 </div>
 <!-- No-license CTA -->
 <div id="ov-no-licenses" class="hidden mt-8 glass rounded-xl p-6 text-center border-dashed border-blue-500/30">
@@ -257,6 +258,39 @@ Annual<br><span class="text-lg font-bold">R6,800</span><span class="text-gray-40
 <div class="glass rounded-xl p-6">
 <h3 class="text-white font-semibold mb-3">Payment History</h3>
 <div id="pay-history"><p class="text-gray-500 text-sm">No payments yet.</p></div>
+</div>
+</div>
+
+<!-- ── Downloads Tab ── -->
+<div id="tab-downloads" class="tab-content">
+<h1 class="text-2xl font-bold text-white mb-2">Downloads</h1>
+<p class="text-gray-400 text-sm mb-6">Download the latest Connexa installer for your platform. Version <span class="text-blue-400 font-medium">__VERSION__</span></p>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+<div class="glass rounded-2xl p-8 text-center hover:border-blue-500/40 transition-all">
+<div class="text-5xl mb-4">&#128039;</div>
+<h3 class="text-xl font-semibold mb-2 text-white">Debian / Ubuntu</h3>
+<p class="text-gray-400 text-sm mb-1">connexa___VERSION___amd64.deb</p>
+<p class="text-gray-500 text-xs mb-6">Ubuntu 22.04+ / Debian 11+ (64-bit)</p>
+<a href="/static/connexa___VERSION___amd64.deb" class="glow-btn py-3 px-8 rounded-xl text-white font-medium no-underline inline-block">&#11015; Download .deb</a>
+<p class="text-gray-600 text-xs mt-4">Install: <code class="bg-gray-800 px-2 py-0.5 rounded text-gray-400">sudo dpkg -i connexa_*.deb</code></p>
+</div>
+<div class="glass rounded-2xl p-8 text-center hover:border-blue-500/40 transition-all">
+<div class="text-5xl mb-4">&#128187;</div>
+<h3 class="text-xl font-semibold mb-2 text-white">Windows</h3>
+<p class="text-gray-400 text-sm mb-1">Connexa-Setup-__VERSION__.exe</p>
+<p class="text-gray-500 text-xs mb-6">Windows 10 / 11 (64-bit)</p>
+<a href="/static/Connexa-Setup-__VERSION__.exe" class="glow-btn py-3 px-8 rounded-xl text-white font-medium no-underline inline-block">&#11015; Download .exe</a>
+<p class="text-gray-600 text-xs mt-4">Run the installer and follow the setup wizard</p>
+</div>
+</div>
+<div class="glass rounded-xl p-6">
+<h3 class="text-white font-semibold mb-3">Installation Guide</h3>
+<div class="space-y-3 text-sm">
+<div class="flex items-start gap-3"><span class="text-blue-400 font-bold">1.</span><p class="text-gray-300">Download the installer for your operating system above.</p></div>
+<div class="flex items-start gap-3"><span class="text-blue-400 font-bold">2.</span><p class="text-gray-300">Run the installer. On Linux use <code class="bg-gray-800 px-1.5 py-0.5 rounded text-gray-400 text-xs">sudo dpkg -i connexa_*.deb</code></p></div>
+<div class="flex items-start gap-3"><span class="text-blue-400 font-bold">3.</span><p class="text-gray-300">Launch Connexa and enter your license key when prompted.</p></div>
+<div class="flex items-start gap-3"><span class="text-blue-400 font-bold">4.</span><p class="text-gray-300">Add your devices and start monitoring your network!</p></div>
+</div>
 </div>
 </div>
 
@@ -475,7 +509,7 @@ async function loadLicenses(){
       +'<span class="px-2 py-0.5 rounded text-xs font-medium '+typeCls+'">'+l.license_type+'</span>'
       +'<span class="ml-2 px-2 py-0.5 rounded text-xs font-medium '+statusCls+'">'+l.status+'</span>'
       +'</div><p class="text-gray-500 text-xs">'+creDate+'</p></div>'
-      +'<p class="license-key font-mono text-cyan-400 text-sm mb-3" onclick="this.classList.toggle(\'revealed\')" title="Click to reveal">'+l.license_key+'</p>'
+      +'<p class="license-key font-mono text-cyan-400 text-sm mb-3" onclick="this.classList.toggle(\\\'revealed\\\')" title="Click to reveal">'+l.license_key+'</p>'
       +'<div class="grid grid-cols-2 gap-2 text-xs"><div><p class="text-gray-500">Hardware</p><p class="text-white">'+hw+'</p></div>'
       +'<div><p class="text-gray-500">Expires</p><p class="text-white">'+expDate+'</p></div></div></div>';
   }).join('');
