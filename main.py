@@ -26,6 +26,9 @@ from templates import WEBSITE_TEMPLATE, GET_STARTED_TEMPLATE
 from portal_template import PORTAL_TEMPLATE
 from admin_template import ADMIN_HTML
 
+# ── Persistent storage abstraction (GCS or local) ──
+import storage as store
+
 app = FastAPI(title="Connexa License Server", version="1.0.0")
 
 app.add_middleware(
@@ -37,14 +40,21 @@ app.add_middleware(
 )
 
 # ── Configuration ──
-LICENSE_DB_FILE = Path(os.getenv("LICENSE_DB_FILE", "/opt/render/project/data/license_database.json"))
-# Fallback for local dev
-if not LICENSE_DB_FILE.parent.exists():
-    LICENSE_DB_FILE = Path("./license_database.json")
+# On Cloud Run containers use /tmp for local caching. On Render use the
+# persistent disk.  For local dev, fall back to the current directory.
+_RENDER_DATA = Path("/opt/render/project/data")
+_CLOUD_RUN_TMP = Path("/tmp/connexify-data")
+if _RENDER_DATA.exists():
+    DATA_DIR = str(_RENDER_DATA)
+elif os.getenv("K_SERVICE"):      # Cloud Run sets K_SERVICE automatically
+    _CLOUD_RUN_TMP.mkdir(parents=True, exist_ok=True)
+    DATA_DIR = str(_CLOUD_RUN_TMP)
+else:
+    DATA_DIR = "."
 
-DATA_DIR = str(LICENSE_DB_FILE.parent)
+LICENSE_DB_FILE = Path(os.path.join(DATA_DIR, "license_database.json"))
 
-ADMIN_TOKEN = os.getenv("ADMIN_SECRET_TOKEN", "your-admin-secret-token-change-this")
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN") or os.getenv("ADMIN_SECRET_TOKEN", "your-admin-secret-token-change-this")
 CURRENT_VERSION = os.getenv("CONNEXA_VERSION", "5.2.8")
 SMTP_HOST = os.getenv("SMTP_HOST", "mail.connexify.co.za")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
@@ -79,18 +89,17 @@ def _hash_password(password: str, salt: str = None) -> tuple:
 
 def load_portal_users():
     global PORTAL_USERS
-    if os.path.exists(PORTAL_USERS_FILE):
-        try:
-            with open(PORTAL_USERS_FILE, 'r') as f:
-                PORTAL_USERS = json.load(f)
+    try:
+        data = store.load_json(PORTAL_USERS_FILE)
+        if data:
+            PORTAL_USERS = data
             print(f"[Portal] Loaded {len(PORTAL_USERS)} portal users")
-        except Exception as e:
-            print(f"[Portal] Error loading users: {e}")
+    except Exception as e:
+        print(f"[Portal] Error loading users: {e}")
 
 def save_portal_users():
     try:
-        with open(PORTAL_USERS_FILE, 'w') as f:
-            json.dump(PORTAL_USERS, f, indent=2)
+        store.save_json(PORTAL_USERS_FILE, PORTAL_USERS)
     except Exception as e:
         print(f"[Portal] Error saving users: {e}")
 
@@ -151,25 +160,22 @@ ACTIVATION_DATABASE = {}
 
 def load_database():
     global LICENSE_DATABASE, ACTIVATION_DATABASE
-    if LICENSE_DB_FILE.exists():
-        try:
-            with open(LICENSE_DB_FILE, 'r') as f:
-                data = json.load(f)
-                LICENSE_DATABASE = data.get('licenses', {})
-                ACTIVATION_DATABASE = data.get('activations', {})
-                print(f"Loaded {len(LICENSE_DATABASE)} licenses")
-        except Exception as e:
-            print(f"Error loading database: {e}")
+    try:
+        data = store.load_json(str(LICENSE_DB_FILE))
+        if data:
+            LICENSE_DATABASE = data.get('licenses', {})
+            ACTIVATION_DATABASE = data.get('activations', {})
+            print(f"Loaded {len(LICENSE_DATABASE)} licenses")
+    except Exception as e:
+        print(f"Error loading database: {e}")
 
 
 def save_database():
     try:
-        LICENSE_DB_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(LICENSE_DB_FILE, 'w') as f:
-            json.dump({
-                'licenses': LICENSE_DATABASE,
-                'activations': ACTIVATION_DATABASE
-            }, f, indent=2)
+        store.save_json(str(LICENSE_DB_FILE), {
+            'licenses': LICENSE_DATABASE,
+            'activations': ACTIVATION_DATABASE
+        })
     except Exception as e:
         print(f"Error saving database: {e}")
 
@@ -327,7 +333,32 @@ class ImportLicenseRequest(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
+    print(f"[Startup] DATA_DIR={DATA_DIR}  GCS_BUCKET={store.GCS_BUCKET or '(none)'}  STATIC_DIR={STATIC_DIR}")
     load_database()
+    load_portal_users()
+    load_social_posts()
+    load_social_accounts()
+
+    # Sync small static files from GCS → local STATIC_DIR (logos, etc.)
+    # Large installer files (.deb/.exe) are served via GCS signed URL redirect
+    if store.using_gcs():
+        try:
+            gcs_files = store.list_files(str(STATIC_DIR))
+            for finfo in gcs_files:
+                fname = finfo["name"]
+                local_path = STATIC_DIR / fname
+                # Skip large files — they'll be served via signed URL redirect
+                if fname.endswith(('.deb', '.exe', '.AppImage', '.dmg', '.zip')) and finfo.get('size_mb', 0) > 10:
+                    print(f"[Startup] Skipping large file {fname} ({finfo['size_mb']} MB) — served via GCS redirect")
+                    continue
+                if not local_path.exists():
+                    data = store.load_file(str(STATIC_DIR), fname)
+                    if data:
+                        local_path.write_bytes(data)
+                        print(f"[Startup] Synced {fname} from GCS ({finfo['size_mb']} MB)")
+        except Exception as e:
+            print(f"[Startup] Error syncing static files from GCS: {e}")
+
     if not LICENSE_DATABASE:
         LICENSE_DATABASE['DEMO1-DEMO2-DEMO3-DEMO4-DEMO5'] = {
             'key': 'DEMO1-DEMO2-DEMO3-DEMO4-DEMO5',
@@ -365,8 +396,26 @@ PORTAL_HTML = _render_template(PORTAL_TEMPLATE)
 # ══════════════════════════════════════════════════════════════════
 
 @app.get("/", response_class=HTMLResponse)
-async def homepage():
-    """Connexify company website"""
+async def homepage(request: Request):
+    """Connexify company website.
+
+    - Redirect the license subdomain to the admin portal.
+    - All other requests for the main domains should land on the
+      step-by-step wizard so that visitors immediately see the
+      download/installation instructions.
+    """
+    # log every header for debugging
+    headers = dict(request.headers)
+    print("[homepage] headers:", headers)
+    host = headers.get("host", "").lower()
+
+    # license subdomain -> admin portal
+    if host.startswith("license."):
+        print("[homepage] redirecting license host to /admin")
+        return RedirectResponse(url="/admin")
+
+    # Serve the full marketing site so that anchor links like
+    # /#downloads, /#pricing, etc. work correctly.
     return HTMLResponse(content=WEBSITE_HTML)
 
 
@@ -419,14 +468,101 @@ async def submit_contact_form(request: ContactFormRequest):
 
 
 # ══════════════════════════════════════════════════════════════════
-#   ROUTES - Free Trial
+#   ROUTES - Free Trial (with email verification)
 # ══════════════════════════════════════════════════════════════════
+
+# In-memory store for email verification codes: {email: {code, expires, name, company, password}}
+EMAIL_VERIFICATION_CODES: dict = {}
 
 class TrialRequest(BaseModel):
     name: str
     email: str
     company: str = ""
     password: str = ""
+    verification_code: str = ""   # Required on second call
+
+
+class VerificationRequest(BaseModel):
+    email: str
+    name: str = ""
+    company: str = ""
+    password: str = ""
+
+
+def send_verification_email(customer_email: str, code: str):
+    """Send a 6-digit verification code to the customer's email."""
+    if not SMTP_USER or not SMTP_PASS:
+        print("Email not configured, skipping verification email")
+        return False
+
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f172a; color: #e2e8f0; padding: 40px; border-radius: 12px;">
+        <h1 style="color: #3b82f6; text-align: center;">Verify Your Email</h1>
+        <p style="text-align: center; color: #94a3b8;">Enter this code to activate your Connexa trial</p>
+        <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 24px; margin: 20px 0; text-align: center;">
+            <p style="color: #94a3b8; margin: 0 0 8px; font-size: 13px;">Your Verification Code</p>
+            <p style="font-size: 36px; font-weight: bold; color: #22d3ee; letter-spacing: 8px; font-family: monospace; margin: 0;">{code}</p>
+        </div>
+        <p style="color: #64748b; font-size: 13px; text-align: center;">This code expires in 10 minutes.</p>
+        <p style="color: #64748b; font-size: 12px; text-align: center; margin-top: 20px;">If you didn't request this, you can safely ignore this email.</p>
+    </div>"""
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = 'Connexa - Email Verification Code'
+    msg['From'] = f'{FROM_NAME} <{FROM_EMAIL}>'
+    msg['To'] = customer_email
+    msg.attach(MIMEText(html, 'html'))
+
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+        server.starttls()
+        server.login(SMTP_USER, SMTP_PASS)
+        server.sendmail(FROM_EMAIL, customer_email, msg.as_string())
+    return True
+
+
+@app.post("/api/trial/send-verification")
+async def send_trial_verification(request: VerificationRequest):
+    """Send a 6-digit verification code to the email before trial activation."""
+    email = request.email.strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Valid email is required")
+
+    # Check if this email already has an expired trial
+    for key, lic in LICENSE_DATABASE.items():
+        if lic.get('customer_email', '').lower() == email and lic.get('is_demo'):
+            expires_str = lic.get('expires', '')
+            try:
+                expires_dt = datetime.fromisoformat(expires_str)
+                if expires_dt < datetime.now():
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Your 7-day trial has expired. Please subscribe to a professional license to continue using Connexa."
+                    )
+            except (ValueError, TypeError):
+                pass
+
+    # Generate 6-digit code
+    import random
+    code = f"{random.randint(100000, 999999)}"
+    EMAIL_VERIFICATION_CODES[email] = {
+        "code": code,
+        "expires": (datetime.now() + timedelta(minutes=10)).isoformat(),
+        "name": request.name,
+        "company": request.company,
+        "password": request.password,
+    }
+    print(f"[Trial Verification] Code generated for {email}: {code}")
+
+    # Send the code
+    if SMTP_USER:
+        try:
+            send_verification_email(email, code)
+            print(f"[Trial Verification] Code sent to {email}")
+        except Exception as e:
+            print(f"[Trial Verification] Email error: {e}")
+            raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again.")
+
+    return {"success": True, "message": "Verification code sent to your email. Check your inbox (and spam folder)."}
 
 
 def send_trial_email(customer_email: str, license_key: str, expires_date: str):
@@ -480,15 +616,45 @@ def send_trial_email(customer_email: str, license_key: str, expires_date: str):
 
 @app.post("/api/trial/activate")
 async def activate_trial(request: TrialRequest):
-    """Generate a 7-day trial license and email it."""
+    """Generate a 7-day trial license and email it. Requires email verification."""
     email = request.email.strip().lower()
     if not email:
         raise HTTPException(status_code=400, detail="Email is required")
 
+    # ── Verify the email verification code ──
+    verification = EMAIL_VERIFICATION_CODES.get(email)
+    if not verification:
+        raise HTTPException(status_code=400, detail="Please verify your email first. Click 'Send Verification Code'.")
+    # Check code expiry
+    try:
+        code_expires = datetime.fromisoformat(verification["expires"])
+        if code_expires < datetime.now():
+            EMAIL_VERIFICATION_CODES.pop(email, None)
+            raise HTTPException(status_code=400, detail="Verification code expired. Please request a new one.")
+    except (ValueError, TypeError):
+        pass
+    # Check code match
+    if request.verification_code.strip() != verification["code"]:
+        raise HTTPException(status_code=400, detail="Invalid verification code. Please check your email and try again.")
+    # Code valid — remove it so it can't be reused
+    EMAIL_VERIFICATION_CODES.pop(email, None)
+
     # Check if this email already has a trial license
     for key, lic in LICENSE_DATABASE.items():
         if lic.get('customer_email', '').lower() == email and lic.get('is_demo'):
-            # Already has a trial — re-send the key
+            # Check if trial has expired
+            expires_str = lic.get('expires', '')
+            try:
+                expires_dt = datetime.fromisoformat(expires_str)
+                if expires_dt < datetime.now():
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Your 7-day trial has expired. Please subscribe to a professional license to continue using Connexa."
+                    )
+            except (ValueError, TypeError):
+                pass  # If we can't parse the date, allow re-send
+
+            # Trial still active — re-send the key
             existing_key = lic['key']
             expires_date = lic.get('expires', 'N/A')
             if SMTP_USER:
@@ -555,11 +721,25 @@ async def activate_trial(request: TrialRequest):
 # ══════════════════════════════════════════════════════════════════
 
 def generate_payfast_signature(data: dict) -> str:
-    """Generate PayFast MD5 signature from payment data."""
-    # Build param string in exact order
-    pf_string = "&".join(f"{k}={urllib.parse.quote_plus(str(v).strip())}" for k, v in data.items() if v)
+    """Generate PayFast MD5 signature from payment data.
+
+    PayFast requires the parameters in the SAME ORDER as the form fields
+    (i.e. dict insertion order).  Empty / None values are excluded.
+    The passphrase (if set) is appended as the final parameter.
+    Values are URL-encoded with quote_plus (with '+' → ' ' pre-replace
+    per PayFast's own Python example).
+    """
+    pairs = []
+    for k, v in data.items():
+        if v is None or str(v).strip() == "":
+            continue
+        val = str(v).strip().replace("+", " ")
+        pairs.append(f"{k}={urllib.parse.quote_plus(val)}")
     if PAYFAST_PASSPHRASE:
-        pf_string += f"&passphrase={urllib.parse.quote_plus(PAYFAST_PASSPHRASE.strip())}"
+        pp = PAYFAST_PASSPHRASE.strip().replace("+", " ")
+        pairs.append(f"passphrase={urllib.parse.quote_plus(pp)}")
+    pf_string = "&".join(pairs)
+    print(f"[PayFast] signing string: {pf_string}")
     return hashlib.md5(pf_string.encode()).hexdigest()
 
 
@@ -591,32 +771,44 @@ async def payfast_checkout(request: PayFastCheckoutRequest):
     item_name = f"Connexa Professional License x{qty} ({cycle_label})"
     item_desc = f"{qty} license(s), {cycle_label}, unlimited devices, all features"
 
-    # Build PayFast data dict (ORDER MATTERS for signature)
+    # Build PayFast data dict — ORDER MUST match PayFast's parameter spec:
+    # merchant_id, merchant_key, return_url, cancel_url, notify_url,
+    # name_first, name_last, email_address, [cell_number],
+    # m_payment_id, amount, item_name, item_description,
+    # custom_int1..5, custom_str1..5, ...
+    name_parts = request.name.split() if request.name else []
     data = {
         "merchant_id": PAYFAST_MERCHANT_ID,
         "merchant_key": PAYFAST_MERCHANT_KEY,
         "return_url": f"{SITE_URL}/api/payfast/return?payment_id={payment_id}",
         "cancel_url": f"{SITE_URL}/api/payfast/cancel",
         "notify_url": f"{SITE_URL}/api/payfast/notify",
-        "name_first": request.name.split()[0] if request.name else "",
-        "name_last": " ".join(request.name.split()[1:]) if len(request.name.split()) > 1 else "",
+        "name_first": name_parts[0] if name_parts else "",
+        "name_last": " ".join(name_parts[1:]) if len(name_parts) > 1 else "",
         "email_address": request.email,
         "m_payment_id": payment_id,
         "amount": f"{total:.2f}",
         "item_name": item_name[:100],
         "item_description": item_desc[:255],
+        "custom_int1": str(qty),
+        "custom_int2": str(1 if cycle == "annual" else 0),  # 1=annual 0=monthly
         "custom_str1": request.email,
         "custom_str2": request.company,
         "custom_str3": request.plan,
-        "custom_int1": str(qty),
-        "custom_int2": str(1 if cycle == "annual" else 0),  # 1=annual 0=monthly
     }
 
     # Generate signature
     signature = generate_payfast_signature(data)
+    # debug logging for signature issues
+    print(f"[PayFast] signing data string: {data}")
+    print(f"[PayFast] computed signature: {signature}")
     data["signature"] = signature
 
-    return {"form_fields": data, "payfast_url": PAYFAST_URL, "payment_id": payment_id}
+    # Strip empty-valued fields so the browser form never sends them
+    clean = {k: v for k, v in data.items() if v is not None and str(v).strip() != ""}
+    clean["signature"] = signature
+
+    return {"form_fields": clean, "payfast_url": PAYFAST_URL, "payment_id": payment_id}
 
 
 @app.post("/api/payfast/notify")
@@ -706,17 +898,26 @@ async def payfast_notify(request: Request):
 @app.post("/api/portal/auth/login")
 async def portal_auth_login(request: Request):
     """Login with email/password, return session token."""
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception as e:
+        print(f"[Portal] login parse error: {e}")
+        raise HTTPException(400, "Malformed JSON")
     email = (body.get("email") or "").strip().lower()
     password = body.get("password") or ""
+    print(f"[Portal] login attempt for {email}")
     if not email or not password:
+        print(f"[Portal] login missing credentials")
         raise HTTPException(400, "Email and password required")
     user = verify_portal_login(email, password)
     if not user:
+        print(f"[Portal] login failed for {email}")
         raise HTTPException(401, "Invalid email or password")
     if user.get("is_suspended"):
+        print(f"[Portal] login suspended account {email}")
         raise HTTPException(403, "Account suspended. Contact support.")
     token = create_session(email)
+    print(f"[Portal] login succeeded for {email}")
     return {"token": token, "user": {"email": user["email"], "full_name": user["full_name"], "company": user.get("company", "")}}
 
 
@@ -962,6 +1163,7 @@ async def portal_subscribe(request: Request):
     item_name = f"Connexa Professional License x{qty} ({cycle_label})"
     item_desc = f"{qty} license(s), {cycle_label}, via Customer Portal"
     name_parts = (user.get("full_name") or "").split()
+    # Order must match PayFast parameter spec: custom_int before custom_str
     data = {
         "merchant_id": PAYFAST_MERCHANT_ID,
         "merchant_key": PAYFAST_MERCHANT_KEY,
@@ -975,18 +1177,17 @@ async def portal_subscribe(request: Request):
         "amount": f"{total:.2f}",
         "item_name": item_name[:100],
         "item_description": item_desc[:255],
+        "custom_int1": str(qty),
+        "custom_int2": str(1 if cycle == "annual" else 0),
         "custom_str1": user["email"],
         "custom_str2": user.get("company", ""),
         "custom_str3": "professional",
-        "custom_int1": str(qty),
-        "custom_int2": str(1 if cycle == "annual" else 0),
     }
     signature = generate_payfast_signature(data)
-    data["signature"] = signature
-    return {"form_fields": data, "payfast_url": PAYFAST_URL, "payment_id": payment_id}
-
-
-@app.post("/api/portal/activate-trial")
+    # Strip empty-valued fields so browser form never sends them
+    clean = {k: v for k, v in data.items() if v is not None and str(v).strip() != ""}
+    clean["signature"] = signature
+    return {"form_fields": clean, "payfast_url": PAYFAST_URL, "payment_id": payment_id}
 async def portal_activate_trial(request: Request):
     """Activate a 7-day trial from the portal."""
     user = await _get_portal_user(request)
@@ -995,6 +1196,18 @@ async def portal_activate_trial(request: Request):
     # Check for existing trial
     for key, lic in LICENSE_DATABASE.items():
         if lic.get('customer_email', '').lower() == email and lic.get('is_demo'):
+            # Check if trial has expired
+            expires_str = lic.get('expires', '')
+            try:
+                expires_dt = datetime.fromisoformat(expires_str)
+                if expires_dt < datetime.now():
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Your 7-day trial has expired. Please subscribe to a professional license to continue using Connexa."
+                    )
+            except (ValueError, TypeError):
+                pass
+            # Trial still active — re-send the key
             if SMTP_USER:
                 try:
                     send_trial_email(email, key, lic.get('expires', '')[:10])
@@ -1319,17 +1532,99 @@ async def health_check():
 
 
 # Serve static files for downloads (DEB / EXE / logos)
-# Use persistent disk on Render so files survive deploys
-_PERSISTENT_STATIC = Path("/opt/render/project/data/static")
-_LOCAL_STATIC = Path(__file__).parent / "static"
-if _PERSISTENT_STATIC.parent.exists():
-    STATIC_DIR = _PERSISTENT_STATIC
-else:
-    STATIC_DIR = _LOCAL_STATIC
-STATIC_DIR.mkdir(exist_ok=True)
+# Use persistent disk on Render, /tmp on Cloud Run, or ./static locally
+STATIC_DIR = Path(os.path.join(DATA_DIR, "static"))
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+
+# copy any files bundled in the repo's static/ directory into the storage folder
+import shutil
+BUILTIN_STATIC = Path(__file__).parent / "static"
+if BUILTIN_STATIC.exists():
+    for child in BUILTIN_STATIC.iterdir():
+        target = STATIC_DIR / child.name
+        if not target.exists():
+            try:
+                shutil.copy(child, target)
+            except Exception:
+                pass
+
+# ── Download route for large installer files (GCS signed URL redirect) ──
+# Must be registered BEFORE the StaticFiles catch-all mount.
+
+@app.get("/static/{filename:path}")
+@app.head("/static/{filename:path}")
+async def serve_static_file(filename: str):
+    """Serve static files.  Large installers redirect to a GCS signed URL
+    so we avoid buffering 100+ MB through this Cloud Run instance."""
+    large_extensions = ('.deb', '.exe', '.AppImage', '.dmg', '.zip')
+    local_path = STATIC_DIR / filename
+
+    # For large installer files, generate a GCS signed URL and redirect
+    if store.using_gcs() and filename.endswith(large_extensions):
+        try:
+            import google.auth
+            from google.auth.transport import requests as gauth_requests
+
+            bucket = store._get_bucket()
+            blob = bucket.blob(f"static/{filename}")
+            if blob.exists():
+                credentials, project = google.auth.default()
+                if hasattr(credentials, 'refresh'):
+                    credentials.refresh(gauth_requests.Request())
+
+                sa_email = getattr(credentials, 'service_account_email', None)
+                token = getattr(credentials, 'token', None)
+
+                if sa_email and token:
+                    # Cloud Run: sign via IAM Credentials API
+                    url = blob.generate_signed_url(
+                        version="v4",
+                        expiration=timedelta(hours=1),
+                        method="GET",
+                        service_account_email=sa_email,
+                        access_token=token,
+                    )
+                else:
+                    # Local / key-based credentials
+                    url = blob.generate_signed_url(
+                        version="v4",
+                        expiration=timedelta(hours=1),
+                        method="GET",
+                    )
+                print(f"[Static] Redirecting {filename} to signed GCS URL")
+                return RedirectResponse(url=url, status_code=302)
+        except Exception as e:
+            print(f"[Static] Signed URL error for {filename}: {e}")
+            # Fall through to local file serving
+
+    # Small files or non-GCS: serve from local filesystem
+    if local_path.exists() and local_path.is_file():
+        return FileResponse(str(local_path), filename=filename)
+
+    raise HTTPException(status_code=404, detail="File not found")
+
 
 from fastapi.staticfiles import StaticFiles
+# Note: the explicit /static/{filename} route above takes priority for matched paths.
+# This mount catches anything the route doesn't handle.
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+# ══════════════════════════════════════════════════════════════════
+#   ROUTES - Health / Status
+# ══════════════════════════════════════════════════════════════════
+
+@app.get("/api/health")
+async def health_check():
+    """Health check for Cloud Run / load balancer probes."""
+    return {
+        "status": "healthy",
+        "version": CURRENT_VERSION,
+        "storage_backend": "gcs" if store.using_gcs() else "local",
+        "gcs_bucket": store.GCS_BUCKET or None,
+        "licenses_loaded": len(LICENSE_DATABASE),
+        "portal_users": len(PORTAL_USERS),
+    }
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -1515,7 +1810,7 @@ async def resend_email(request: ResendEmailRequest):
 
 @app.post("/api/admin/upload-installer")
 async def upload_installer(admin_token: str = Form(...), file: UploadFile = File(...)):
-    """Upload installer files (DEB/EXE) via admin API"""
+    """Upload installer files (DEB/EXE) via admin API – saves to GCS + local"""
     if admin_token != ADMIN_TOKEN:
         raise HTTPException(status_code=403, detail="Unauthorized")
     
@@ -1523,10 +1818,8 @@ async def upload_installer(admin_token: str = Form(...), file: UploadFile = File
     if not any(file.filename.endswith(ext) for ext in allowed_ext):
         raise HTTPException(status_code=400, detail=f"Only installer/image files allowed: {allowed_ext}")
     
-    filepath = os.path.join(STATIC_DIR, file.filename)
     contents = await file.read()
-    with open(filepath, "wb") as f:
-        f.write(contents)
+    store.save_file(str(STATIC_DIR), file.filename, contents)
     
     size_mb = len(contents) / (1024 * 1024)
     return {"success": True, "filename": file.filename, "size_mb": round(size_mb, 2)}
@@ -1534,16 +1827,11 @@ async def upload_installer(admin_token: str = Form(...), file: UploadFile = File
 
 @app.get("/api/admin/list-files")
 async def list_files(admin_token: str = ""):
-    """List uploaded installer files"""
+    """List uploaded installer files (from GCS + local)"""
     if admin_token != ADMIN_TOKEN:
         raise HTTPException(status_code=403, detail="Unauthorized")
     
-    files = []
-    if os.path.exists(STATIC_DIR):
-        for f in os.listdir(STATIC_DIR):
-            fpath = os.path.join(STATIC_DIR, f)
-            if os.path.isfile(fpath):
-                files.append({"name": f, "size_mb": round(os.path.getsize(fpath) / (1024*1024), 2)})
+    files = store.list_files(str(STATIC_DIR))
     return {"files": files}
 
 
@@ -1585,6 +1873,297 @@ async def edit_license(request: EditLicenseRequest):
     return {"success": True, "message": f"License updated ({', '.join(changes)})", "license": lic}
 
 
+# ══════════════════════════════════════════════════════════════════
+#   SOCIAL MEDIA MANAGEMENT
+# ══════════════════════════════════════════════════════════════════
+
+SOCIAL_POSTS_FILE = os.path.join(DATA_DIR, "social_posts.json")
+SOCIAL_ACCOUNTS_FILE = os.path.join(DATA_DIR, "social_accounts.json")
+SOCIAL_POSTS: list = []
+SOCIAL_ACCOUNTS: list = []
+
+
+def load_social_posts():
+    global SOCIAL_POSTS
+    try:
+        data = store.load_json(SOCIAL_POSTS_FILE)
+        if isinstance(data, dict) and "posts" in data:
+            SOCIAL_POSTS = data["posts"]
+        elif isinstance(data, list):
+            SOCIAL_POSTS = data
+        else:
+            SOCIAL_POSTS = []
+        print(f"[Social] Loaded {len(SOCIAL_POSTS)} posts")
+    except Exception as e:
+        print(f"[Social] Error loading posts: {e}")
+        SOCIAL_POSTS = []
+
+
+def save_social_posts():
+    store.save_json(SOCIAL_POSTS_FILE, {"posts": SOCIAL_POSTS})
+
+
+def load_social_accounts():
+    global SOCIAL_ACCOUNTS
+    try:
+        data = store.load_json(SOCIAL_ACCOUNTS_FILE)
+        if isinstance(data, dict) and "accounts" in data:
+            SOCIAL_ACCOUNTS = data["accounts"]
+        elif isinstance(data, list):
+            SOCIAL_ACCOUNTS = data
+        else:
+            SOCIAL_ACCOUNTS = []
+        print(f"[Social] Loaded {len(SOCIAL_ACCOUNTS)} accounts")
+    except Exception as e:
+        print(f"[Social] Error loading accounts: {e}")
+        SOCIAL_ACCOUNTS = []
+
+
+def save_social_accounts():
+    store.save_json(SOCIAL_ACCOUNTS_FILE, {"accounts": SOCIAL_ACCOUNTS})
+
+
+# ── Social Posts CRUD ──
+
+@app.get("/api/admin/social/posts")
+async def list_social_posts(admin_token: str = "", token: str = ""):
+    tok = admin_token or token
+    if tok != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    return {"posts": SOCIAL_POSTS}
+
+
+@app.post("/api/admin/social/posts")
+async def create_social_post(request: Request):
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    post = {
+        "id": secrets.token_hex(8),
+        "content": body.get("content", ""),
+        "platforms": body.get("platforms", []),
+        "scheduled_date": body.get("scheduled_date", ""),
+        "scheduled_time": body.get("scheduled_time", "09:00"),
+        "status": body.get("status", "draft"),
+        "image_url": body.get("image_url", ""),
+        "hashtags": body.get("hashtags", ""),
+        "campaign": body.get("campaign", ""),
+        "created_at": datetime.now().isoformat(),
+        "updated_at": datetime.now().isoformat(),
+    }
+    SOCIAL_POSTS.append(post)
+    save_social_posts()
+    return {"success": True, "post": post}
+
+
+@app.post("/api/admin/social/posts/edit")
+async def edit_social_post(request: Request):
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    post_id = body.get("post_id")
+    post = next((p for p in SOCIAL_POSTS if p["id"] == post_id), None)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    for field in ["content", "platforms", "scheduled_date", "scheduled_time",
+                   "status", "image_url", "hashtags", "campaign"]:
+        if field in body:
+            post[field] = body[field]
+    post["updated_at"] = datetime.now().isoformat()
+    save_social_posts()
+    return {"success": True, "post": post}
+
+
+@app.post("/api/admin/social/posts/delete")
+async def delete_social_post(request: Request):
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    post_id = body.get("post_id")
+    global SOCIAL_POSTS
+    SOCIAL_POSTS = [p for p in SOCIAL_POSTS if p["id"] != post_id]
+    save_social_posts()
+    return {"success": True}
+
+
+@app.post("/api/admin/social/posts/duplicate")
+async def duplicate_social_post(request: Request):
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    post_id = body.get("post_id")
+    original = next((p for p in SOCIAL_POSTS if p["id"] == post_id), None)
+    if not original:
+        raise HTTPException(status_code=404, detail="Post not found")
+    new_post = {**original}
+    new_post["id"] = secrets.token_hex(8)
+    new_post["status"] = "draft"
+    new_post["created_at"] = datetime.now().isoformat()
+    new_post["updated_at"] = datetime.now().isoformat()
+    SOCIAL_POSTS.append(new_post)
+    save_social_posts()
+    return {"success": True, "post": new_post}
+
+
+@app.post("/api/admin/social/posts/bulk-schedule")
+async def bulk_schedule_posts(request: Request):
+    """Schedule multiple posts with a recurring interval."""
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    post_ids = body.get("post_ids", [])
+    start_date = body.get("start_date", "")
+    interval_days = int(body.get("interval_days", 3))
+    time_of_day = body.get("time", "09:00")
+
+    if not start_date or not post_ids:
+        raise HTTPException(status_code=400, detail="start_date and post_ids required")
+
+    from datetime import date as dt_date
+    current = datetime.fromisoformat(start_date).date()
+    scheduled = 0
+    for pid in post_ids:
+        post = next((p for p in SOCIAL_POSTS if p["id"] == pid), None)
+        if post:
+            post["scheduled_date"] = current.isoformat()
+            post["scheduled_time"] = time_of_day
+            post["status"] = "scheduled"
+            post["updated_at"] = datetime.now().isoformat()
+            current += timedelta(days=interval_days)
+            scheduled += 1
+    save_social_posts()
+    return {"success": True, "scheduled": scheduled}
+
+
+@app.post("/api/admin/social/posts/import-csv")
+async def import_social_csv(request: Request):
+    """Import posts from CSV data. Expects JSON body with csv_rows array."""
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    rows = body.get("csv_rows", [])
+    imported = 0
+    for row in rows:
+        post = {
+            "id": secrets.token_hex(8),
+            "content": row.get("content", row.get("text", "")),
+            "platforms": [p.strip() for p in row.get("platforms", "").split(",") if p.strip()] if isinstance(row.get("platforms"), str) else row.get("platforms", []),
+            "scheduled_date": row.get("scheduled_date", row.get("date", "")),
+            "scheduled_time": row.get("scheduled_time", row.get("time", "09:00")),
+            "status": row.get("status", "draft"),
+            "image_url": row.get("image_url", ""),
+            "hashtags": row.get("hashtags", ""),
+            "campaign": row.get("campaign", ""),
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+        }
+        SOCIAL_POSTS.append(post)
+        imported += 1
+    save_social_posts()
+    return {"success": True, "imported": imported}
+
+
+@app.post("/api/admin/social/posts/mark-published")
+async def mark_post_published(request: Request):
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    post_id = body.get("post_id")
+    post = next((p for p in SOCIAL_POSTS if p["id"] == post_id), None)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    post["status"] = "published"
+    post["published_at"] = datetime.now().isoformat()
+    post["updated_at"] = datetime.now().isoformat()
+    save_social_posts()
+    return {"success": True, "post": post}
+
+
+# ── Social Accounts CRUD ──
+
+@app.get("/api/admin/social/accounts")
+async def list_social_accounts(admin_token: str = "", token: str = ""):
+    tok = admin_token or token
+    if tok != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    # Strip sensitive keys from response
+    safe = []
+    for acc in SOCIAL_ACCOUNTS:
+        a = {**acc}
+        if "api_secret" in a:
+            a["api_secret"] = "••••" + a["api_secret"][-4:] if len(a.get("api_secret", "")) > 4 else "••••"
+        if "access_token_secret" in a:
+            a["access_token_secret"] = "••••"
+        safe.append(a)
+    return {"accounts": safe}
+
+
+@app.post("/api/admin/social/accounts")
+async def save_social_account(request: Request):
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    account = {
+        "id": body.get("id") or secrets.token_hex(8),
+        "platform": body.get("platform", ""),
+        "account_name": body.get("account_name", ""),
+        "api_key": body.get("api_key", ""),
+        "api_secret": body.get("api_secret", ""),
+        "access_token": body.get("access_token", ""),
+        "access_token_secret": body.get("access_token_secret", ""),
+        "page_id": body.get("page_id", ""),
+        "enabled": body.get("enabled", True),
+        "updated_at": datetime.now().isoformat(),
+    }
+    # Update existing or add new
+    global SOCIAL_ACCOUNTS
+    existing = next((i for i, a in enumerate(SOCIAL_ACCOUNTS) if a["id"] == account["id"]), None)
+    if existing is not None:
+        # Preserve secrets if not changed
+        old = SOCIAL_ACCOUNTS[existing]
+        if account["api_secret"].startswith("••••"):
+            account["api_secret"] = old.get("api_secret", "")
+        if account["access_token_secret"] == "••••":
+            account["access_token_secret"] = old.get("access_token_secret", "")
+        SOCIAL_ACCOUNTS[existing] = account
+    else:
+        account["created_at"] = datetime.now().isoformat()
+        SOCIAL_ACCOUNTS.append(account)
+    save_social_accounts()
+    return {"success": True, "account": {"id": account["id"], "platform": account["platform"]}}
+
+
+@app.post("/api/admin/social/accounts/delete")
+async def delete_social_account(request: Request):
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    acc_id = body.get("account_id")
+    global SOCIAL_ACCOUNTS
+    SOCIAL_ACCOUNTS = [a for a in SOCIAL_ACCOUNTS if a["id"] != acc_id]
+    save_social_accounts()
+    return {"success": True}
+
+
+# ── Social Stats ──
+
+@app.get("/api/admin/social/stats")
+async def social_stats(admin_token: str = "", token: str = ""):
+    tok = admin_token or token
+    if tok != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    total = len(SOCIAL_POSTS)
+    draft = sum(1 for p in SOCIAL_POSTS if p.get("status") == "draft")
+    scheduled = sum(1 for p in SOCIAL_POSTS if p.get("status") == "scheduled")
+    published = sum(1 for p in SOCIAL_POSTS if p.get("status") == "published")
+    accounts = len([a for a in SOCIAL_ACCOUNTS if a.get("enabled", True)])
+    return {
+        "total_posts": total,
+        "draft": draft,
+        "scheduled": scheduled,
+        "published": published,
+        "active_accounts": accounts,
+    }
 
 
 @app.get("/admin", response_class=HTMLResponse)

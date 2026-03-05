@@ -77,6 +77,7 @@ ADMIN_HTML = """<!DOCTYPE html>
             <div class="flex gap-1 border-b border-slate-700/50 mb-6 overflow-x-auto">
                 <button onclick="switchTab('licenses')" class="tab-btn active px-5 py-3 text-sm font-medium text-slate-400" data-tab="licenses">&#128272; Licenses</button>
                 <button onclick="switchTab('users')" class="tab-btn px-5 py-3 text-sm font-medium text-slate-400" data-tab="users">&#128101; Portal Users</button>
+                <button onclick="switchTab('social')" class="tab-btn px-5 py-3 text-sm font-medium text-slate-400" data-tab="social">&#128226; Social Media</button>
                 <button onclick="switchTab('smtp')" class="tab-btn px-5 py-3 text-sm font-medium text-slate-400" data-tab="smtp">&#128231; SMTP Settings</button>
                 <button onclick="switchTab('admins')" class="tab-btn px-5 py-3 text-sm font-medium text-slate-400" data-tab="admins">&#128737; Admins</button>
             </div>
@@ -138,6 +139,111 @@ ADMIN_HTML = """<!DOCTYPE html>
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+
+            <!-- TAB: Social Media -->
+            <div id="tab-social" class="tab-content hidden">
+                <!-- Social Stats -->
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    <div class="glass rounded-xl p-4">
+                        <p class="text-xs text-slate-400 mb-1">Total Posts</p>
+                        <p id="social-stat-total" class="text-2xl font-bold text-white">-</p>
+                    </div>
+                    <div class="glass rounded-xl p-4">
+                        <p class="text-xs text-slate-400 mb-1">Drafts</p>
+                        <p id="social-stat-draft" class="text-2xl font-bold text-yellow-400">-</p>
+                    </div>
+                    <div class="glass rounded-xl p-4">
+                        <p class="text-xs text-slate-400 mb-1">Scheduled</p>
+                        <p id="social-stat-scheduled" class="text-2xl font-bold text-blue-400">-</p>
+                    </div>
+                    <div class="glass rounded-xl p-4">
+                        <p class="text-xs text-slate-400 mb-1">Published</p>
+                        <p id="social-stat-published" class="text-2xl font-bold text-green-400">-</p>
+                    </div>
+                    <div class="glass rounded-xl p-4">
+                        <p class="text-xs text-slate-400 mb-1">Accounts</p>
+                        <p id="social-stat-accounts" class="text-2xl font-bold text-cyan-400">-</p>
+                    </div>
+                </div>
+
+                <!-- Sub-tabs -->
+                <div class="flex gap-2 mb-6">
+                    <button onclick="switchSocialSub('posts')" class="social-sub-btn active px-4 py-2 text-xs font-medium text-white bg-blue-600/30 border border-blue-500/30 rounded-lg" data-sub="posts">Posts</button>
+                    <button onclick="switchSocialSub('calendar')" class="social-sub-btn px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800/30 border border-slate-700/30 rounded-lg" data-sub="calendar">Calendar</button>
+                    <button onclick="switchSocialSub('accounts')" class="social-sub-btn px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800/30 border border-slate-700/30 rounded-lg" data-sub="accounts">Accounts</button>
+                </div>
+
+                <!-- Sub: Posts List -->
+                <div id="social-sub-posts" class="social-sub-content">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                        <h2 class="text-xl font-bold text-white">Social Posts</h2>
+                        <div class="flex gap-2">
+                            <select id="social-filter-status" onchange="loadSocialPosts()" class="px-3 py-2 rounded-lg text-xs">
+                                <option value="">All Statuses</option>
+                                <option value="draft">Drafts</option>
+                                <option value="scheduled">Scheduled</option>
+                                <option value="published">Published</option>
+                            </select>
+                            <button onclick="showSocialPostModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">+ New Post</button>
+                            <button onclick="showImportCSVModal()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-xs font-medium transition">&#128196; Import CSV</button>
+                            <button onclick="showBulkScheduleModal()" class="bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-xs font-medium transition">&#128197; Bulk Schedule</button>
+                        </div>
+                    </div>
+                    <div class="glass rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-700/50 text-left text-slate-400">
+                                        <th class="px-4 py-3 font-medium w-8"><input type="checkbox" id="select-all-posts" onchange="toggleSelectAll()" class="w-4 h-4 rounded"></th>
+                                        <th class="px-4 py-3 font-medium">Content</th>
+                                        <th class="px-4 py-3 font-medium">Platforms</th>
+                                        <th class="px-4 py-3 font-medium">Scheduled</th>
+                                        <th class="px-4 py-3 font-medium">Status</th>
+                                        <th class="px-4 py-3 font-medium">Campaign</th>
+                                        <th class="px-4 py-3 font-medium text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="social-posts-body">
+                                    <tr><td colspan="7" class="px-4 py-10 text-center text-slate-500">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub: Calendar View -->
+                <div id="social-sub-calendar" class="social-sub-content hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-bold text-white">Post Schedule</h2>
+                        <div class="flex items-center gap-3">
+                            <button onclick="calendarPrev()" class="px-3 py-1.5 rounded-lg bg-slate-700 text-white text-sm">&larr;</button>
+                            <span id="calendar-month" class="text-white font-medium text-sm"></span>
+                            <button onclick="calendarNext()" class="px-3 py-1.5 rounded-lg bg-slate-700 text-white text-sm">&rarr;</button>
+                        </div>
+                    </div>
+                    <div class="glass rounded-xl p-4">
+                        <div class="grid grid-cols-7 gap-1 mb-2">
+                            <div class="text-center text-xs text-slate-500 py-1">Sun</div>
+                            <div class="text-center text-xs text-slate-500 py-1">Mon</div>
+                            <div class="text-center text-xs text-slate-500 py-1">Tue</div>
+                            <div class="text-center text-xs text-slate-500 py-1">Wed</div>
+                            <div class="text-center text-xs text-slate-500 py-1">Thu</div>
+                            <div class="text-center text-xs text-slate-500 py-1">Fri</div>
+                            <div class="text-center text-xs text-slate-500 py-1">Sat</div>
+                        </div>
+                        <div id="calendar-grid" class="grid grid-cols-7 gap-1"></div>
+                    </div>
+                </div>
+
+                <!-- Sub: Accounts -->
+                <div id="social-sub-accounts" class="social-sub-content hidden">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                        <h2 class="text-xl font-bold text-white">Social Accounts</h2>
+                        <button onclick="showAccountModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">+ Add Account</button>
+                    </div>
+                    <div id="accounts-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                 </div>
             </div>
 
@@ -326,6 +432,148 @@ ADMIN_HTML = """<!DOCTYPE html>
         </div>
     </div>
 
+    <!-- Social Post Modal -->
+    <div id="social-post-modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-bg">
+        <div class="glass rounded-2xl p-8 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 id="social-post-modal-title" class="text-lg font-bold text-white mb-6">New Post</h3>
+            <input type="hidden" id="social-post-edit-id" value="">
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Content</label>
+                    <textarea id="sp-content" rows="4" placeholder="Write your post content..." class="w-full px-4 py-2.5 rounded-lg text-sm resize-none" style="background:rgba(15,23,42,0.8);border:1px solid rgba(71,85,105,0.4);color:#e2e8f0;"></textarea>
+                    <span id="sp-char-count" class="text-xs text-slate-500 mt-1 block">0 / 280</span>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Platforms</label>
+                    <div class="flex flex-wrap gap-2">
+                        <label class="flex items-center gap-1.5 text-xs text-slate-300"><input type="checkbox" id="sp-plat-twitter" class="w-3.5 h-3.5 rounded"> Twitter/X</label>
+                        <label class="flex items-center gap-1.5 text-xs text-slate-300"><input type="checkbox" id="sp-plat-linkedin" class="w-3.5 h-3.5 rounded"> LinkedIn</label>
+                        <label class="flex items-center gap-1.5 text-xs text-slate-300"><input type="checkbox" id="sp-plat-facebook" class="w-3.5 h-3.5 rounded"> Facebook</label>
+                        <label class="flex items-center gap-1.5 text-xs text-slate-300"><input type="checkbox" id="sp-plat-instagram" class="w-3.5 h-3.5 rounded"> Instagram</label>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">Scheduled Date</label>
+                        <input id="sp-date" type="date" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">Time</label>
+                        <input id="sp-time" type="time" value="09:00" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Hashtags</label>
+                    <input id="sp-hashtags" type="text" placeholder="#connexa #networkmonitoring" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Campaign</label>
+                    <input id="sp-campaign" type="text" placeholder="e.g. v5.2 Launch" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Image URL (optional)</label>
+                    <input id="sp-image" type="url" placeholder="https://..." class="w-full px-4 py-2.5 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Status</label>
+                    <select id="sp-status" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                        <option value="draft">Draft</option>
+                        <option value="scheduled">Scheduled</option>
+                        <option value="published">Published</option>
+                    </select>
+                </div>
+                <div class="flex gap-3 mt-4">
+                    <button onclick="saveSocialPost()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-sm font-medium transition">Save</button>
+                    <button onclick="closeModal('social-post-modal')" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-sm font-medium transition">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import CSV Modal -->
+    <div id="import-csv-modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-bg">
+        <div class="glass rounded-2xl p-8 w-full max-w-lg mx-4">
+            <h3 class="text-lg font-bold text-white mb-4">Import Posts from CSV</h3>
+            <p class="text-xs text-slate-400 mb-4">Paste CSV data below. Columns: content, platforms, scheduled_date, scheduled_time, hashtags, campaign, status</p>
+            <textarea id="csv-data" rows="8" placeholder="content,platforms,scheduled_date,scheduled_time,hashtags,campaign,status
+&quot;Check out Connexa v5.2!&quot;,twitter;linkedin,2025-03-06,09:00,#connexa #networkmonitoring,v5.2 Launch,draft" class="w-full px-4 py-2.5 rounded-lg text-sm font-mono resize-none" style="background:rgba(15,23,42,0.8);border:1px solid rgba(71,85,105,0.4);color:#e2e8f0;"></textarea>
+            <div class="flex gap-3 mt-4">
+                <button onclick="importCSV()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-sm font-medium transition">Import</button>
+                <button onclick="closeModal('import-csv-modal')" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-sm font-medium transition">Cancel</button>
+            </div>
+            <p id="csv-result" class="text-sm text-center mt-3 hidden"></p>
+        </div>
+    </div>
+
+    <!-- Bulk Schedule Modal -->
+    <div id="bulk-schedule-modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-bg">
+        <div class="glass rounded-2xl p-8 w-full max-w-md mx-4">
+            <h3 class="text-lg font-bold text-white mb-4">Bulk Schedule Posts</h3>
+            <p class="text-xs text-slate-400 mb-4">Schedule all selected / draft posts with a recurring interval.</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Start Date</label>
+                    <input id="bulk-start-date" type="date" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Post Every (days)</label>
+                    <input id="bulk-interval" type="number" value="3" min="1" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Time of Day</label>
+                    <input id="bulk-time" type="time" value="09:00" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                </div>
+                <div class="flex gap-3 mt-4">
+                    <button onclick="bulkSchedule()" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-2.5 rounded-lg text-sm font-medium transition">Schedule</button>
+                    <button onclick="closeModal('bulk-schedule-modal')" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-sm font-medium transition">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Social Account Modal -->
+    <div id="account-modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-bg">
+        <div class="glass rounded-2xl p-8 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 id="account-modal-title" class="text-lg font-bold text-white mb-6">Add Account</h3>
+            <input type="hidden" id="acc-edit-id" value="">
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Platform</label>
+                    <select id="acc-platform" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                        <option value="twitter">Twitter / X</option>
+                        <option value="linkedin">LinkedIn</option>
+                        <option value="facebook">Facebook</option>
+                        <option value="instagram">Instagram</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Account Name / Handle</label>
+                    <input id="acc-name" type="text" placeholder="@connexify" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">API Key / Client ID</label>
+                    <input id="acc-api-key" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">API Secret / Client Secret</label>
+                    <input id="acc-api-secret" type="password" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Access Token</label>
+                    <input id="acc-access-token" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Access Token Secret (Twitter) / Page ID (Facebook)</label>
+                    <input id="acc-extra" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                </div>
+                <div class="flex gap-3 mt-4">
+                    <button onclick="saveAccount()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-sm font-medium transition">Save</button>
+                    <button onclick="closeModal('account-modal')" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-sm font-medium transition">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast -->
     <div id="toast" class="fixed bottom-6 right-6 bg-green-600 text-white px-6 py-3 rounded-xl shadow-lg text-sm font-medium transform translate-y-20 opacity-0 transition-all duration-300 z-50"></div>
 
@@ -363,6 +611,7 @@ ADMIN_HTML = """<!DOCTYPE html>
             if (tab === 'users') loadPortalUsers();
             if (tab === 'smtp') loadSmtpSettings();
             if (tab === 'admins') loadAdmins();
+            if (tab === 'social') { loadSocialPosts(); loadSocialStats(); }
         }
 
         // Stats
@@ -705,6 +954,433 @@ ADMIN_HTML = """<!DOCTYPE html>
         document.querySelectorAll('.modal-bg').forEach(el => {
             el.addEventListener('click', e => { if (e.target === el) closeModal(el.id); });
         });
+
+        // ═══════════════════════════════════════════════
+        //   SOCIAL MEDIA MANAGEMENT
+        // ═══════════════════════════════════════════════
+
+        let socialPosts = [];
+        let socialAccounts = [];
+        let calendarDate = new Date();
+
+        // Social sub-tabs
+        function switchSocialSub(sub) {
+            document.querySelectorAll('.social-sub-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.social-sub-btn').forEach(el => {
+                el.classList.remove('active');
+                el.className = el.className.replace('text-white bg-blue-600/30 border-blue-500/30', 'text-slate-400 bg-slate-800/30 border-slate-700/30');
+            });
+            document.getElementById('social-sub-' + sub).classList.remove('hidden');
+            const btn = document.querySelector(`.social-sub-btn[data-sub="${sub}"]`);
+            btn.className = btn.className.replace('text-slate-400 bg-slate-800/30 border-slate-700/30', 'text-white bg-blue-600/30 border-blue-500/30');
+            btn.classList.add('active');
+            if (sub === 'calendar') renderCalendar();
+            if (sub === 'accounts') loadSocialAccounts();
+        }
+
+        // Social Stats
+        async function loadSocialStats() {
+            try {
+                const r = await fetch(`${BASE}/api/admin/social/stats?admin_token=${encodeURIComponent(TOKEN)}`);
+                const d = await r.json();
+                document.getElementById('social-stat-total').textContent = d.total_posts;
+                document.getElementById('social-stat-draft').textContent = d.draft;
+                document.getElementById('social-stat-scheduled').textContent = d.scheduled;
+                document.getElementById('social-stat-published').textContent = d.published;
+                document.getElementById('social-stat-accounts').textContent = d.active_accounts;
+            } catch(e) { console.error('Stats error:', e); }
+        }
+
+        // Load Posts
+        async function loadSocialPosts() {
+            try {
+                const r = await fetch(`${BASE}/api/admin/social/posts?admin_token=${encodeURIComponent(TOKEN)}`);
+                const d = await r.json();
+                socialPosts = d.posts || [];
+                renderSocialPosts();
+                loadSocialStats();
+            } catch(e) { console.error('Load posts error:', e); }
+        }
+
+        function renderSocialPosts() {
+            const filter = document.getElementById('social-filter-status').value;
+            let posts = socialPosts;
+            if (filter) posts = posts.filter(p => p.status === filter);
+            // Sort: scheduled first, then drafts, then published; within each by date
+            posts.sort((a, b) => {
+                const order = {scheduled: 0, draft: 1, published: 2};
+                const oa = order[a.status] ?? 3, ob = order[b.status] ?? 3;
+                if (oa !== ob) return oa - ob;
+                return (a.scheduled_date || '').localeCompare(b.scheduled_date || '');
+            });
+            const tbody = document.getElementById('social-posts-body');
+            if (posts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-10 text-center text-slate-500">No posts found. Click + New Post to start.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = posts.map(p => {
+                const statusColors = {draft: 'bg-yellow-600/20 text-yellow-400', scheduled: 'bg-blue-600/20 text-blue-400', published: 'bg-green-600/20 text-green-400'};
+                const statusCls = statusColors[p.status] || 'bg-slate-600/20 text-slate-400';
+                const pIcons = (p.platforms || []).map(pl => {
+                    const icons = {twitter: '𝕏', linkedin: 'in', facebook: 'f', instagram: '📷'};
+                    return `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] bg-slate-700 text-slate-300">${icons[pl] || pl}</span>`;
+                }).join(' ');
+                const truncated = (p.content || '').length > 80 ? p.content.substring(0, 80) + '...' : (p.content || '');
+                const schedDate = p.scheduled_date ? `${p.scheduled_date} ${p.scheduled_time || ''}` : '<span class="text-slate-600">Not set</span>';
+                return `<tr class="border-b border-slate-700/30 hover:bg-slate-800/30 transition">
+                    <td class="px-4 py-3"><input type="checkbox" class="post-checkbox w-4 h-4 rounded" data-id="${p.id}"></td>
+                    <td class="px-4 py-3 text-xs text-slate-200 max-w-xs">${escapeHtml(truncated)}</td>
+                    <td class="px-4 py-3">${pIcons || '<span class="text-slate-600 text-xs">-</span>'}</td>
+                    <td class="px-4 py-3 text-xs text-slate-300">${schedDate}</td>
+                    <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 rounded ${statusCls}">${p.status}</span></td>
+                    <td class="px-4 py-3 text-xs text-slate-400">${escapeHtml(p.campaign || '-')}</td>
+                    <td class="px-4 py-3 text-right">
+                        <div class="flex items-center justify-end gap-1">
+                            <button onclick="editSocialPost('${p.id}')" class="px-2 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-xs text-white transition" title="Edit">&#9998;</button>
+                            <button onclick="duplicatePost('${p.id}')" class="px-2 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-xs text-cyan-300 transition" title="Duplicate">&#128203;</button>
+                            ${p.status !== 'published' ? `<button onclick="markPublished('${p.id}')" class="px-2 py-1.5 rounded-md bg-green-700/50 hover:bg-green-600/50 text-xs text-green-300 transition" title="Mark Published">&#10003;</button>` : ''}
+                            <button onclick="deleteSocialPost('${p.id}')" class="px-2 py-1.5 rounded-md bg-red-700/50 hover:bg-red-600/50 text-xs text-red-300 transition" title="Delete">&#128465;</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function escapeHtml(text) {
+            const d = document.createElement('div');
+            d.textContent = text;
+            return d.innerHTML;
+        }
+
+        function toggleSelectAll() {
+            const checked = document.getElementById('select-all-posts').checked;
+            document.querySelectorAll('.post-checkbox').forEach(cb => cb.checked = checked);
+        }
+
+        function getSelectedPostIds() {
+            return Array.from(document.querySelectorAll('.post-checkbox:checked')).map(cb => cb.dataset.id);
+        }
+
+        // Character counter
+        document.addEventListener('input', e => {
+            if (e.target.id === 'sp-content') {
+                const len = e.target.value.length;
+                const counter = document.getElementById('sp-char-count');
+                counter.textContent = `${len} / 280`;
+                counter.className = len > 280 ? 'text-xs text-red-400 mt-1 block' : 'text-xs text-slate-500 mt-1 block';
+            }
+        });
+
+        // Create / Edit Post Modal
+        function showSocialPostModal() {
+            document.getElementById('social-post-modal-title').textContent = 'New Post';
+            document.getElementById('social-post-edit-id').value = '';
+            document.getElementById('sp-content').value = '';
+            document.getElementById('sp-date').value = '';
+            document.getElementById('sp-time').value = '09:00';
+            document.getElementById('sp-hashtags').value = '';
+            document.getElementById('sp-campaign').value = '';
+            document.getElementById('sp-image').value = '';
+            document.getElementById('sp-status').value = 'draft';
+            ['twitter','linkedin','facebook','instagram'].forEach(p => document.getElementById('sp-plat-'+p).checked = false);
+            document.getElementById('sp-char-count').textContent = '0 / 280';
+            document.getElementById('social-post-modal').classList.remove('hidden');
+            document.getElementById('social-post-modal').classList.add('flex');
+        }
+
+        function editSocialPost(id) {
+            const post = socialPosts.find(p => p.id === id);
+            if (!post) return;
+            document.getElementById('social-post-modal-title').textContent = 'Edit Post';
+            document.getElementById('social-post-edit-id').value = id;
+            document.getElementById('sp-content').value = post.content || '';
+            document.getElementById('sp-date').value = post.scheduled_date || '';
+            document.getElementById('sp-time').value = post.scheduled_time || '09:00';
+            document.getElementById('sp-hashtags').value = post.hashtags || '';
+            document.getElementById('sp-campaign').value = post.campaign || '';
+            document.getElementById('sp-image').value = post.image_url || '';
+            document.getElementById('sp-status').value = post.status || 'draft';
+            const platforms = post.platforms || [];
+            ['twitter','linkedin','facebook','instagram'].forEach(p => {
+                document.getElementById('sp-plat-'+p).checked = platforms.includes(p);
+            });
+            const len = (post.content || '').length;
+            document.getElementById('sp-char-count').textContent = `${len} / 280`;
+            document.getElementById('social-post-modal').classList.remove('hidden');
+            document.getElementById('social-post-modal').classList.add('flex');
+        }
+
+        async function saveSocialPost() {
+            const editId = document.getElementById('social-post-edit-id').value;
+            const platforms = [];
+            ['twitter','linkedin','facebook','instagram'].forEach(p => {
+                if (document.getElementById('sp-plat-'+p).checked) platforms.push(p);
+            });
+            const body = {
+                admin_token: TOKEN,
+                content: document.getElementById('sp-content').value.trim(),
+                platforms,
+                scheduled_date: document.getElementById('sp-date').value,
+                scheduled_time: document.getElementById('sp-time').value || '09:00',
+                hashtags: document.getElementById('sp-hashtags').value.trim(),
+                campaign: document.getElementById('sp-campaign').value.trim(),
+                image_url: document.getElementById('sp-image').value.trim(),
+                status: document.getElementById('sp-status').value,
+            };
+            let url = `${BASE}/api/admin/social/posts`;
+            if (editId) { body.post_id = editId; url += '/edit'; }
+            const r = await fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            const d = await r.json();
+            if (d.success) { closeModal('social-post-modal'); showToast(editId ? 'Post updated' : 'Post created'); loadSocialPosts(); }
+        }
+
+        async function deleteSocialPost(id) {
+            if (!confirm('Delete this post?')) return;
+            const r = await fetch(`${BASE}/api/admin/social/posts/delete`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ admin_token: TOKEN, post_id: id })
+            });
+            if ((await r.json()).success) { showToast('Post deleted'); loadSocialPosts(); }
+        }
+
+        async function duplicatePost(id) {
+            const r = await fetch(`${BASE}/api/admin/social/posts/duplicate`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ admin_token: TOKEN, post_id: id })
+            });
+            if ((await r.json()).success) { showToast('Post duplicated'); loadSocialPosts(); }
+        }
+
+        async function markPublished(id) {
+            const r = await fetch(`${BASE}/api/admin/social/posts/mark-published`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ admin_token: TOKEN, post_id: id })
+            });
+            if ((await r.json()).success) { showToast('Marked as published'); loadSocialPosts(); }
+        }
+
+        // CSV Import
+        function showImportCSVModal() {
+            document.getElementById('csv-data').value = '';
+            document.getElementById('csv-result').classList.add('hidden');
+            document.getElementById('import-csv-modal').classList.remove('hidden');
+            document.getElementById('import-csv-modal').classList.add('flex');
+        }
+
+        async function importCSV() {
+            const raw = document.getElementById('csv-data').value.trim();
+            if (!raw) return;
+            const lines = raw.split('\\n');
+            const header = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+            const rows = [];
+            for (let i = 1; i < lines.length; i++) {
+                const vals = parseCSVLine(lines[i]);
+                if (vals.length < 1) continue;
+                const row = {};
+                header.forEach((h, idx) => { row[h] = (vals[idx] || '').trim(); });
+                if (row.content || row.text) rows.push(row);
+            }
+            if (rows.length === 0) {
+                const el = document.getElementById('csv-result');
+                el.textContent = 'No valid rows found. Check your CSV format.';
+                el.className = 'text-sm text-center mt-3 text-red-400'; el.classList.remove('hidden');
+                return;
+            }
+            const r = await fetch(`${BASE}/api/admin/social/posts/import-csv`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ admin_token: TOKEN, csv_rows: rows })
+            });
+            const d = await r.json();
+            if (d.success) {
+                closeModal('import-csv-modal');
+                showToast(`Imported ${d.imported} posts`);
+                loadSocialPosts();
+            }
+        }
+
+        function parseCSVLine(line) {
+            const result = []; let current = ''; let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const ch = line[i];
+                if (ch === '"') { inQuotes = !inQuotes; }
+                else if (ch === ',' && !inQuotes) { result.push(current); current = ''; }
+                else { current += ch; }
+            }
+            result.push(current);
+            return result;
+        }
+
+        // Bulk Schedule
+        function showBulkScheduleModal() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('bulk-start-date').value = today;
+            document.getElementById('bulk-interval').value = '3';
+            document.getElementById('bulk-time').value = '09:00';
+            document.getElementById('bulk-schedule-modal').classList.remove('hidden');
+            document.getElementById('bulk-schedule-modal').classList.add('flex');
+        }
+
+        async function bulkSchedule() {
+            let ids = getSelectedPostIds();
+            if (ids.length === 0) {
+                // If none selected, use all drafts
+                ids = socialPosts.filter(p => p.status === 'draft').map(p => p.id);
+            }
+            if (ids.length === 0) { showToast('No posts to schedule'); return; }
+            const r = await fetch(`${BASE}/api/admin/social/posts/bulk-schedule`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    admin_token: TOKEN,
+                    post_ids: ids,
+                    start_date: document.getElementById('bulk-start-date').value,
+                    interval_days: parseInt(document.getElementById('bulk-interval').value) || 3,
+                    time: document.getElementById('bulk-time').value || '09:00'
+                })
+            });
+            const d = await r.json();
+            if (d.success) {
+                closeModal('bulk-schedule-modal');
+                showToast(`Scheduled ${d.scheduled} posts`);
+                loadSocialPosts();
+            }
+        }
+
+        // Calendar
+        function renderCalendar() {
+            const year = calendarDate.getFullYear();
+            const month = calendarDate.getMonth();
+            const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+            document.getElementById('calendar-month').textContent = `${monthNames[month]} ${year}`;
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const today = new Date().toISOString().split('T')[0];
+            // Build map of posts per day
+            const dayPosts = {};
+            socialPosts.forEach(p => {
+                if (p.scheduled_date) {
+                    const d = p.scheduled_date.substring(0, 10);
+                    if (!dayPosts[d]) dayPosts[d] = [];
+                    dayPosts[d].push(p);
+                }
+            });
+            let html = '';
+            // Blanks for first row
+            for (let i = 0; i < firstDay; i++) html += '<div class="min-h-[80px] rounded-lg"></div>';
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                const isToday = dateStr === today;
+                const posts = dayPosts[dateStr] || [];
+                const bgClass = isToday ? 'bg-blue-900/30 border-blue-500/40' : 'bg-slate-800/30 border-slate-700/20';
+                html += `<div class="min-h-[80px] rounded-lg border ${bgClass} p-1.5">`;
+                html += `<div class="text-xs font-medium ${isToday ? 'text-blue-400' : 'text-slate-400'} mb-1">${day}</div>`;
+                posts.forEach(p => {
+                    const colors = {draft: 'bg-yellow-600/30 text-yellow-300', scheduled: 'bg-blue-600/30 text-blue-300', published: 'bg-green-600/30 text-green-300'};
+                    const cls = colors[p.status] || 'bg-slate-600/30 text-slate-300';
+                    const text = (p.content || '').substring(0, 25);
+                    html += `<div class="text-[10px] ${cls} rounded px-1 py-0.5 mb-0.5 truncate cursor-pointer" onclick="editSocialPost('${p.id}')" title="${escapeHtml(p.content || '')}">${escapeHtml(text)}</div>`;
+                });
+                html += '</div>';
+            }
+            document.getElementById('calendar-grid').innerHTML = html;
+        }
+
+        function calendarPrev() { calendarDate.setMonth(calendarDate.getMonth() - 1); renderCalendar(); }
+        function calendarNext() { calendarDate.setMonth(calendarDate.getMonth() + 1); renderCalendar(); }
+
+        // Social Accounts
+        async function loadSocialAccounts() {
+            try {
+                const r = await fetch(`${BASE}/api/admin/social/accounts?admin_token=${encodeURIComponent(TOKEN)}`);
+                const d = await r.json();
+                socialAccounts = d.accounts || [];
+                renderAccounts();
+            } catch(e) { console.error('Load accounts error:', e); }
+        }
+
+        function renderAccounts() {
+            const container = document.getElementById('accounts-list');
+            if (socialAccounts.length === 0) {
+                container.innerHTML = '<div class="col-span-2 glass rounded-xl p-8 text-center text-slate-500">No social accounts configured. Click + Add Account to connect a platform.</div>';
+                return;
+            }
+            const platformColors = {
+                twitter: 'from-slate-800 to-slate-900 border-slate-600', linkedin: 'from-blue-900/30 to-blue-950/30 border-blue-700/30',
+                facebook: 'from-blue-800/20 to-blue-900/20 border-blue-600/30', instagram: 'from-purple-900/20 to-pink-900/20 border-purple-600/30'
+            };
+            const platformIcons = { twitter: '𝕏', linkedin: 'in', facebook: 'f', instagram: '📷' };
+            container.innerHTML = socialAccounts.map(a => {
+                const cls = platformColors[a.platform] || 'from-slate-800 to-slate-900 border-slate-600';
+                const icon = platformIcons[a.platform] || '?';
+                const enabledBadge = a.enabled !== false
+                    ? '<span class="text-[10px] bg-green-600/20 text-green-400 px-1.5 py-0.5 rounded">Active</span>'
+                    : '<span class="text-[10px] bg-red-600/20 text-red-400 px-1.5 py-0.5 rounded">Disabled</span>';
+                return `<div class="rounded-xl bg-gradient-to-br ${cls} border p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-slate-700/50 flex items-center justify-center text-lg font-bold text-white">${icon}</div>
+                            <div>
+                                <p class="text-white text-sm font-medium capitalize">${a.platform}</p>
+                                <p class="text-xs text-slate-400">${escapeHtml(a.account_name || '-')}</p>
+                            </div>
+                        </div>
+                        ${enabledBadge}
+                    </div>
+                    <div class="text-xs text-slate-500 mb-3">API Key: ${a.api_key ? '••••' + a.api_key.slice(-4) : 'Not set'}</div>
+                    <div class="flex gap-2">
+                        <button onclick="editAccount('${a.id}')" class="px-3 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-xs text-white transition">Edit</button>
+                        <button onclick="deleteAccount('${a.id}')" class="px-3 py-1.5 rounded-md bg-red-700/50 hover:bg-red-600/50 text-xs text-red-300 transition">Remove</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function showAccountModal(acc) {
+            document.getElementById('account-modal-title').textContent = acc ? 'Edit Account' : 'Add Account';
+            document.getElementById('acc-edit-id').value = acc ? acc.id : '';
+            document.getElementById('acc-platform').value = acc ? acc.platform : 'twitter';
+            document.getElementById('acc-name').value = acc ? acc.account_name : '';
+            document.getElementById('acc-api-key').value = acc ? acc.api_key : '';
+            document.getElementById('acc-api-secret').value = acc ? (acc.api_secret || '') : '';
+            document.getElementById('acc-access-token').value = acc ? acc.access_token : '';
+            document.getElementById('acc-extra').value = acc ? (acc.access_token_secret || acc.page_id || '') : '';
+            document.getElementById('account-modal').classList.remove('hidden');
+            document.getElementById('account-modal').classList.add('flex');
+        }
+
+        function editAccount(id) {
+            const acc = socialAccounts.find(a => a.id === id);
+            if (acc) showAccountModal(acc);
+        }
+
+        async function saveAccount() {
+            const platform = document.getElementById('acc-platform').value;
+            const body = {
+                admin_token: TOKEN,
+                id: document.getElementById('acc-edit-id').value || undefined,
+                platform,
+                account_name: document.getElementById('acc-name').value.trim(),
+                api_key: document.getElementById('acc-api-key').value.trim(),
+                api_secret: document.getElementById('acc-api-secret').value,
+                access_token: document.getElementById('acc-access-token').value.trim(),
+            };
+            const extra = document.getElementById('acc-extra').value.trim();
+            if (platform === 'twitter') body.access_token_secret = extra;
+            else body.page_id = extra;
+            const r = await fetch(`${BASE}/api/admin/social/accounts`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+            });
+            const d = await r.json();
+            if (d.success) { closeModal('account-modal'); showToast('Account saved'); loadSocialAccounts(); }
+        }
+
+        async function deleteAccount(id) {
+            if (!confirm('Remove this social account?')) return;
+            const r = await fetch(`${BASE}/api/admin/social/accounts/delete`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ admin_token: TOKEN, account_id: id })
+            });
+            if ((await r.json()).success) { showToast('Account removed'); loadSocialAccounts(); }
+        }
     </script>
 </body>
 </html>"""
