@@ -2733,6 +2733,493 @@ async def preview_automation(request: Request):
     return {"previews": previews, "platform": platform}
 
 
+# ═══════════════════════════════════════════════════════
+#   SOCIAL MEDIA PUBLISHING ENGINE
+#   Publishes scheduled posts via platform APIs
+# ═══════════════════════════════════════════════════════
+
+import httpx
+import base64
+import hmac as _hmac
+import time as _time
+import urllib.parse as _urlparse
+
+PUBLISH_LOG_FILE = "publish_log.json"
+
+def _load_publish_log():
+    try:
+        data = store.load(PUBLISH_LOG_FILE)
+        if isinstance(data, list):
+            return data[-500:]
+        return []
+    except:
+        return []
+
+def _save_publish_log(entries):
+    store.save(PUBLISH_LOG_FILE, entries[-500:])
+
+def _get_account_for_platform(platform: str):
+    """Find enabled account with credentials for a platform."""
+    for a in SOCIAL_ACCOUNTS:
+        if a.get("platform") == platform and a.get("enabled", True):
+            # Check has minimum credentials
+            if platform == "twitter" and a.get("api_key") and a.get("api_secret") and a.get("access_token") and a.get("access_token_secret"):
+                return a
+            elif platform == "linkedin" and a.get("access_token"):
+                return a
+            elif platform == "facebook" and a.get("access_token"):
+                return a
+    return None
+
+
+# ── Twitter/X API v2 Publishing (OAuth 1.0a) ──
+
+def _twitter_oauth_signature(method, url, params, consumer_secret, token_secret):
+    """Create OAuth 1.0a signature for Twitter API."""
+    sorted_params = "&".join(f"{_urlparse.quote(k, safe='')}={_urlparse.quote(v, safe='')}"
+                             for k, v in sorted(params.items()))
+    base_string = f"{method.upper()}&{_urlparse.quote(url, safe='')}&{_urlparse.quote(sorted_params, safe='')}"
+    signing_key = f"{_urlparse.quote(consumer_secret, safe='')}&{_urlparse.quote(token_secret, safe='')}"
+    sig = _hmac.new(signing_key.encode(), base_string.encode(), hashlib.sha1)
+    return base64.b64encode(sig.digest()).decode()
+
+
+async def publish_to_twitter(content: str, account: dict) -> dict:
+    """Publish a tweet using Twitter API v2 with OAuth 1.0a."""
+    url = "https://api.twitter.com/2/tweets"
+    consumer_key = account["api_key"]
+    consumer_secret = account["api_secret"]
+    access_token = account["access_token"]
+    access_token_secret = account["access_token_secret"]
+
+    # Build OAuth params
+    oauth_params = {
+        "oauth_consumer_key": consumer_key,
+        "oauth_nonce": secrets.token_hex(16),
+        "oauth_signature_method": "HMAC-SHA1",
+        "oauth_timestamp": str(int(_time.time())),
+        "oauth_token": access_token,
+        "oauth_version": "1.0",
+    }
+    sig = _twitter_oauth_signature("POST", url, oauth_params, consumer_secret, access_token_secret)
+    oauth_params["oauth_signature"] = sig
+    auth_header = "OAuth " + ", ".join(
+        f'{_urlparse.quote(k, safe="")}="{_urlparse.quote(v, safe="")}"'
+        for k, v in sorted(oauth_params.items())
+    )
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(url, json={"text": content}, headers={
+            "Authorization": auth_header,
+            "Content-Type": "application/json",
+        })
+    if resp.status_code in (200, 201):
+        data = resp.json()
+        tweet_id = data.get("data", {}).get("id", "")
+        return {"success": True, "post_url": f"https://x.com/i/status/{tweet_id}", "platform_id": tweet_id}
+    else:
+        return {"success": False, "error": f"Twitter API {resp.status_code}: {resp.text[:200]}"}
+
+
+# ── LinkedIn API Publishing ──
+
+async def publish_to_linkedin(content: str, account: dict) -> dict:
+    """Publish to LinkedIn using v2 API (UGC Posts)."""
+    access_token = account["access_token"]
+    person_urn = account.get("page_id", "")  # Format: urn:li:person:XXXX or urn:li:organization:XXXX
+
+    if not person_urn:
+        # Try to get profile URN
+        async with httpx.AsyncClient(timeout=30) as client:
+            prof = await client.get("https://api.linkedin.com/v2/userinfo", headers={
+                "Authorization": f"Bearer {access_token}",
+            })
+        if prof.status_code == 200:
+            sub = prof.json().get("sub", "")
+            person_urn = f"urn:li:person:{sub}"
+        else:
+            return {"success": False, "error": f"LinkedIn profile lookup failed: {prof.status_code}"}
+
+    # Create UGC post
+    post_body = {
+        "author": person_urn,
+        "lifecycleState": "PUBLISHED",
+        "specificContent": {
+            "com.linkedin.ugc.ShareContent": {
+                "shareCommentary": {"text": content},
+                "shareMediaCategory": "NONE",
+            }
+        },
+        "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
+    }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post("https://api.linkedin.com/v2/ugcPosts", json=post_body, headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+            "X-Restli-Protocol-Version": "2.0.0",
+        })
+    if resp.status_code in (200, 201):
+        post_id = resp.headers.get("x-restli-id", resp.json().get("id", ""))
+        return {"success": True, "post_url": f"https://www.linkedin.com/feed/update/{post_id}", "platform_id": post_id}
+    else:
+        return {"success": False, "error": f"LinkedIn API {resp.status_code}: {resp.text[:200]}"}
+
+
+# ── Facebook Graph API Publishing ──
+
+async def publish_to_facebook(content: str, account: dict) -> dict:
+    """Publish to Facebook Page using Graph API."""
+    access_token = account["access_token"]
+    page_id = account.get("page_id", "me")
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"https://graph.facebook.com/v19.0/{page_id}/feed",
+            data={"message": content, "access_token": access_token},
+        )
+    if resp.status_code == 200:
+        post_id = resp.json().get("id", "")
+        return {"success": True, "post_url": f"https://www.facebook.com/{post_id}", "platform_id": post_id}
+    else:
+        return {"success": False, "error": f"Facebook API {resp.status_code}: {resp.text[:200]}"}
+
+
+# ── Unified Publisher ──
+
+PLATFORM_PUBLISHERS = {
+    "twitter": publish_to_twitter,
+    "linkedin": publish_to_linkedin,
+    "facebook": publish_to_facebook,
+}
+
+async def publish_post(post: dict) -> dict:
+    """Attempt to publish a post to all its target platforms."""
+    results = []
+    platforms = post.get("platforms", [])
+    pub_log = _load_publish_log()
+
+    for platform in platforms:
+        account = _get_account_for_platform(platform)
+        if not account:
+            results.append({"platform": platform, "success": False, "error": "No account configured"})
+            continue
+
+        publisher = PLATFORM_PUBLISHERS.get(platform)
+        if not publisher:
+            results.append({"platform": platform, "success": False, "error": "Unsupported platform"})
+            continue
+
+        try:
+            result = await publisher(post["content"], account)
+            results.append({"platform": platform, **result})
+            pub_log.append({
+                "timestamp": datetime.now().isoformat(),
+                "post_id": post.get("id"),
+                "platform": platform,
+                "action": "published" if result["success"] else "publish_failed",
+                "post_url": result.get("post_url", ""),
+                "error": result.get("error", ""),
+                "content_preview": post["content"][:80],
+            })
+        except Exception as e:
+            results.append({"platform": platform, "success": False, "error": str(e)[:200]})
+            pub_log.append({
+                "timestamp": datetime.now().isoformat(),
+                "post_id": post.get("id"),
+                "platform": platform,
+                "action": "publish_error",
+                "error": str(e)[:200],
+            })
+
+    _save_publish_log(pub_log)
+    return {"results": results}
+
+
+# ── Auto-Publisher Background Loop ──
+
+async def _auto_publish_cycle():
+    """Check for scheduled posts that are due and publish them."""
+    config = load_automation_config()
+    if not config.get("enabled"):
+        return
+
+    tz_offset = config.get("posting_schedule", {}).get("timezone_offset", 2)
+    now_sast = datetime.utcnow() + timedelta(hours=tz_offset)
+    now_date = now_sast.strftime("%Y-%m-%d")
+    now_time = now_sast.strftime("%H:%M")
+
+    published_count = 0
+
+    for post in SOCIAL_POSTS:
+        if post.get("status") != "scheduled":
+            continue
+        sched_date = post.get("scheduled_date", "")
+        sched_time = post.get("scheduled_time", "")
+
+        # Only publish posts that are at or past their scheduled time
+        if sched_date > now_date:
+            continue
+        if sched_date == now_date and sched_time > now_time:
+            continue
+
+        # Try to publish
+        result = await publish_post(post)
+        successes = [r for r in result["results"] if r.get("success")]
+        failures = [r for r in result["results"] if not r.get("success")]
+
+        if successes:
+            post["status"] = "published"
+            post["published_at"] = datetime.now().isoformat()
+            post["publish_urls"] = {r["platform"]: r.get("post_url", "") for r in successes}
+            published_count += 1
+
+            # Log to automation log too
+            auto_log = load_automation_log()
+            for s in successes:
+                auto_log.append({
+                    "timestamp": datetime.now().isoformat(),
+                    "platform": s["platform"],
+                    "action": "published",
+                    "post_id": post["id"],
+                    "content_preview": post["content"][:80],
+                    "post_url": s.get("post_url", ""),
+                })
+            save_automation_log(auto_log)
+
+        if failures and not successes:
+            # All platforms failed — mark as failed, will retry next cycle (up to 3 times)
+            retries = post.get("publish_retries", 0)
+            if retries >= 3:
+                post["status"] = "failed"
+                post["fail_reason"] = failures[0].get("error", "Unknown error")
+            else:
+                post["publish_retries"] = retries + 1
+
+    if published_count > 0:
+        save_social_posts()
+        config["total_published"] = config.get("total_published", 0) + published_count
+        save_automation_config(config)
+        print(f"[AutoPublish] Published {published_count} post(s)")
+
+
+# Extend the automation loop to also run auto-publishing
+_original_automation_loop = _automation_loop
+
+async def _automation_loop():
+    """Enhanced automation loop — generates AND publishes posts."""
+    while True:
+        try:
+            await run_automation_cycle()
+        except Exception as e:
+            print(f"[Automation] Generate error: {e}")
+        try:
+            await _auto_publish_cycle()
+        except Exception as e:
+            print(f"[AutoPublish] Error: {e}")
+        await asyncio.sleep(1800)
+
+
+# ── Publishing API Endpoints ──
+
+@app.post("/api/admin/social/publish")
+async def publish_post_now(request: Request):
+    """Manually publish a specific post immediately."""
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    post_id = body.get("post_id")
+    post = next((p for p in SOCIAL_POSTS if p["id"] == post_id), None)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    result = await publish_post(post)
+    successes = [r for r in result["results"] if r.get("success")]
+    if successes:
+        post["status"] = "published"
+        post["published_at"] = datetime.now().isoformat()
+        post["publish_urls"] = {r["platform"]: r.get("post_url", "") for r in successes}
+        save_social_posts()
+
+    return {"success": len(successes) > 0, "results": result["results"]}
+
+
+@app.get("/api/admin/social/publish/log")
+async def get_publish_log(admin_token: str = "", token: str = "", limit: int = 50):
+    tok = admin_token or token
+    if tok != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    return {"entries": _load_publish_log()[-limit:]}
+
+
+@app.get("/api/admin/social/publish/status")
+async def get_publish_status(admin_token: str = "", token: str = ""):
+    """Get publishing pipeline status — connected accounts, queue depth, etc."""
+    tok = admin_token or token
+    if tok != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    config = load_automation_config()
+    platforms = config.get("platforms", ["twitter", "linkedin"])
+
+    accounts_status = {}
+    for platform in ["twitter", "linkedin", "facebook"]:
+        acc = _get_account_for_platform(platform)
+        accounts_status[platform] = {
+            "connected": acc is not None,
+            "account_name": acc.get("account_name", "") if acc else "",
+            "enabled": platform in platforms,
+        }
+
+    # Count posts by status
+    scheduled_count = sum(1 for p in SOCIAL_POSTS if p.get("status") == "scheduled")
+    published_count = sum(1 for p in SOCIAL_POSTS if p.get("status") == "published")
+    failed_count = sum(1 for p in SOCIAL_POSTS if p.get("status") == "failed")
+    draft_count = sum(1 for p in SOCIAL_POSTS if p.get("status") == "draft")
+
+    return {
+        "automation_enabled": config.get("enabled", False),
+        "accounts": accounts_status,
+        "queue": {
+            "scheduled": scheduled_count,
+            "published": published_count,
+            "failed": failed_count,
+            "drafts": draft_count,
+        },
+        "total_published": config.get("total_published", 0),
+        "last_run": config.get("last_run"),
+    }
+
+
+@app.post("/api/admin/social/accounts/test")
+async def test_social_account(request: Request):
+    """Test if a social media account's API credentials are valid."""
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    account_id = body.get("account_id")
+    account = next((a for a in SOCIAL_ACCOUNTS if a["id"] == account_id), None)
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    platform = account["platform"]
+    try:
+        if platform == "twitter":
+            # Verify credentials via Twitter API v2
+            url = "https://api.twitter.com/2/users/me"
+            oauth_params = {
+                "oauth_consumer_key": account["api_key"],
+                "oauth_nonce": secrets.token_hex(16),
+                "oauth_signature_method": "HMAC-SHA1",
+                "oauth_timestamp": str(int(_time.time())),
+                "oauth_token": account["access_token"],
+                "oauth_version": "1.0",
+            }
+            sig = _twitter_oauth_signature("GET", url, oauth_params, account["api_secret"], account["access_token_secret"])
+            oauth_params["oauth_signature"] = sig
+            auth_header = "OAuth " + ", ".join(
+                f'{_urlparse.quote(k, safe="")}="{_urlparse.quote(v, safe="")}"'
+                for k, v in sorted(oauth_params.items())
+            )
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(url, headers={"Authorization": auth_header})
+            if resp.status_code == 200:
+                user_data = resp.json().get("data", {})
+                return {"success": True, "platform": "twitter", "username": user_data.get("username", ""), "name": user_data.get("name", "")}
+            else:
+                return {"success": False, "error": f"Twitter returned {resp.status_code}: {resp.text[:150]}"}
+
+        elif platform == "linkedin":
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get("https://api.linkedin.com/v2/userinfo", headers={
+                    "Authorization": f"Bearer {account['access_token']}",
+                })
+            if resp.status_code == 200:
+                d = resp.json()
+                return {"success": True, "platform": "linkedin", "username": d.get("name", ""), "name": d.get("name", "")}
+            else:
+                return {"success": False, "error": f"LinkedIn returned {resp.status_code}: {resp.text[:150]}"}
+
+        elif platform == "facebook":
+            async with httpx.AsyncClient(timeout=15) as client:
+                page_id = account.get("page_id", "me")
+                resp = await client.get(f"https://graph.facebook.com/v19.0/{page_id}",
+                                        params={"access_token": account["access_token"], "fields": "name,id"})
+            if resp.status_code == 200:
+                d = resp.json()
+                return {"success": True, "platform": "facebook", "username": d.get("name", ""), "name": d.get("name", "")}
+            else:
+                return {"success": False, "error": f"Facebook returned {resp.status_code}: {resp.text[:150]}"}
+
+        else:
+            return {"success": False, "error": f"Unsupported platform: {platform}"}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)[:200]}
+
+
+# ── Setup Wizard Endpoint ──
+
+@app.get("/api/admin/social/setup-guide")
+async def get_setup_guide(admin_token: str = "", token: str = ""):
+    """Return setup instructions for each platform."""
+    tok = admin_token or token
+    if tok != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    return {
+        "platforms": {
+            "twitter": {
+                "name": "Twitter / X",
+                "signup_url": "https://x.com/i/flow/signup",
+                "developer_url": "https://developer.x.com/en/portal/dashboard",
+                "steps": [
+                    "1. Create a Twitter/X account at x.com/i/flow/signup",
+                    "2. Go to developer.x.com and sign up for a Developer account (Free tier)",
+                    "3. Create a Project and App in the Developer Portal",
+                    "4. In your App settings, set up 'User authentication settings' — enable OAuth 1.0a with Read+Write",
+                    "5. Generate your API Key, API Secret, Access Token, and Access Token Secret",
+                    "6. Enter all 4 credentials in the Add Account form below",
+                ],
+                "fields": ["api_key", "api_secret", "access_token", "access_token_secret"],
+                "free_tier": "1,500 tweets/month (Free), 3,000 tweets/month (Basic $200/mo)",
+            },
+            "linkedin": {
+                "name": "LinkedIn",
+                "signup_url": "https://www.linkedin.com/signup",
+                "developer_url": "https://www.linkedin.com/developers/apps",
+                "steps": [
+                    "1. Create a LinkedIn account at linkedin.com/signup",
+                    "2. Create a LinkedIn Company Page for Connexify",
+                    "3. Go to linkedin.com/developers/apps and create a new app",
+                    "4. Request 'Share on LinkedIn' and 'Sign In with LinkedIn' products",
+                    "5. Generate an Access Token (valid 60 days — auto-refresh will be added)",
+                    "6. Enter the Access Token and your company page URN (urn:li:organization:XXXXX) below",
+                ],
+                "fields": ["access_token", "page_id"],
+                "free_tier": "Unlimited posts (standard API — rate limited to 100 calls/day)",
+            },
+            "facebook": {
+                "name": "Facebook",
+                "signup_url": "https://www.facebook.com/r.php",
+                "developer_url": "https://developers.facebook.com/apps/",
+                "steps": [
+                    "1. Create a Facebook account at facebook.com",
+                    "2. Create a Facebook Page for Connexify",
+                    "3. Go to developers.facebook.com and create a new app (Business type)",
+                    "4. Add 'Pages API' product to your app",
+                    "5. Generate a Page Access Token with 'pages_manage_posts' permission",
+                    "6. Enter the Page Access Token and Page ID below",
+                ],
+                "fields": ["access_token", "page_id"],
+                "free_tier": "Unlimited posts with Page Access Token",
+            },
+        }
+    }
+
+
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard():
     """License management admin dashboard"""

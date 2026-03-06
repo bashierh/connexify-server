@@ -328,8 +328,42 @@ ADMIN_HTML = """<!DOCTYPE html>
 
                 <!-- Sub: Accounts -->
                 <div id="social-sub-accounts" class="social-sub-content hidden">
+                    <!-- Publishing Pipeline Status -->
+                    <div class="glass rounded-xl p-6 mb-6 border border-slate-700/30">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-xl font-bold text-white">Publishing Pipeline</h2>
+                            <button onclick="loadPublishStatus()" class="text-xs text-slate-400 hover:text-white">&#8635; Refresh</button>
+                        </div>
+                        <div id="pipeline-status" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div class="bg-slate-800/50 rounded-lg p-4 text-center">
+                                <div id="pipe-twitter-dot" class="w-3 h-3 rounded-full bg-red-500 mx-auto mb-2"></div>
+                                <p class="text-sm text-white font-medium">Twitter / X</p>
+                                <p id="pipe-twitter-status" class="text-xs text-slate-400 mt-1">Not connected</p>
+                                <button onclick="showSetupGuide('twitter')" class="mt-2 text-[10px] text-blue-400 hover:text-blue-300 underline">Setup Guide</button>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4 text-center">
+                                <div id="pipe-linkedin-dot" class="w-3 h-3 rounded-full bg-red-500 mx-auto mb-2"></div>
+                                <p class="text-sm text-white font-medium">LinkedIn</p>
+                                <p id="pipe-linkedin-status" class="text-xs text-slate-400 mt-1">Not connected</p>
+                                <button onclick="showSetupGuide('linkedin')" class="mt-2 text-[10px] text-blue-400 hover:text-blue-300 underline">Setup Guide</button>
+                            </div>
+                            <div class="bg-slate-800/50 rounded-lg p-4 text-center">
+                                <div id="pipe-facebook-dot" class="w-3 h-3 rounded-full bg-red-500 mx-auto mb-2"></div>
+                                <p class="text-sm text-white font-medium">Facebook</p>
+                                <p id="pipe-facebook-status" class="text-xs text-slate-400 mt-1">Not connected</p>
+                                <button onclick="showSetupGuide('facebook')" class="mt-2 text-[10px] text-blue-400 hover:text-blue-300 underline">Setup Guide</button>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 text-xs text-slate-500 border-t border-slate-700/30 pt-3">
+                            <span>Queue: <strong id="pipe-queue-count" class="text-white">0</strong> scheduled</span>
+                            <span>Published: <strong id="pipe-published-count" class="text-white">0</strong></span>
+                            <span>Failed: <strong id="pipe-failed-count" class="text-red-400">0</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Connected Accounts -->
                     <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-                        <h2 class="text-xl font-bold text-white">Social Accounts</h2>
+                        <h3 class="text-lg font-bold text-white">Connected Accounts</h3>
                         <button onclick="showAccountModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">+ Add Account</button>
                     </div>
                     <div id="accounts-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
@@ -1161,7 +1195,7 @@ ADMIN_HTML = """<!DOCTYPE html>
             btn.className = btn.className.replace('text-slate-400 bg-slate-800/30 border-slate-700/30', 'text-white bg-blue-600/30 border-blue-500/30');
             btn.classList.add('active');
             if (sub === 'calendar') renderCalendar();
-            if (sub === 'accounts') loadSocialAccounts();
+            if (sub === 'accounts') { loadSocialAccounts(); loadPublishStatus(); }
             if (sub === 'automation') loadAutomationConfig();
         }
 
@@ -1225,6 +1259,7 @@ ADMIN_HTML = """<!DOCTYPE html>
                         <div class="flex items-center justify-end gap-1">
                             <button onclick="editSocialPost('${p.id}')" class="px-2 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-xs text-white transition" title="Edit">&#9998;</button>
                             <button onclick="duplicatePost('${p.id}')" class="px-2 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-xs text-cyan-300 transition" title="Duplicate">&#128203;</button>
+                            ${p.status === 'scheduled' ? `<button onclick="publishPostNow('${p.id}')" class="px-2 py-1.5 rounded-md bg-blue-700/50 hover:bg-blue-600/50 text-xs text-blue-300 transition" title="Publish Now">&#128640;</button>` : ''}
                             ${p.status !== 'published' ? `<button onclick="markPublished('${p.id}')" class="px-2 py-1.5 rounded-md bg-green-700/50 hover:bg-green-600/50 text-xs text-green-300 transition" title="Mark Published">&#10003;</button>` : ''}
                             <button onclick="deleteSocialPost('${p.id}')" class="px-2 py-1.5 rounded-md bg-red-700/50 hover:bg-red-600/50 text-xs text-red-300 transition" title="Delete">&#128465;</button>
                         </div>
@@ -1513,7 +1548,9 @@ ADMIN_HTML = """<!DOCTYPE html>
                         ${enabledBadge}
                     </div>
                     <div class="text-xs text-slate-500 mb-3">API Key: ${a.api_key ? '••••' + a.api_key.slice(-4) : 'Not set'}</div>
+                    <div id="test-result-${a.id}" class="text-xs mb-2 hidden"></div>
                     <div class="flex gap-2">
+                        <button onclick="testAccount('${a.id}')" class="px-3 py-1.5 rounded-md bg-green-700/50 hover:bg-green-600/50 text-xs text-green-300 transition">&#9889; Test</button>
                         <button onclick="editAccount('${a.id}')" class="px-3 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-xs text-white transition">Edit</button>
                         <button onclick="deleteAccount('${a.id}')" class="px-3 py-1.5 rounded-md bg-red-700/50 hover:bg-red-600/50 text-xs text-red-300 transition">Remove</button>
                     </div>
@@ -1761,6 +1798,7 @@ ADMIN_HTML = """<!DOCTYPE html>
                     const actionColors = {
                         generated: 'text-green-400', manual_generate: 'text-cyan-400',
                         skipped: 'text-yellow-400', error: 'text-red-400',
+                        published: 'text-emerald-400', publish_failed: 'text-red-400',
                     };
                     const color = actionColors[e.action] || 'text-slate-400';
                     const time = e.timestamp ? e.timestamp.substring(11, 16) : '';
@@ -1781,6 +1819,109 @@ ADMIN_HTML = """<!DOCTYPE html>
                 const d = await r.json();
                 document.getElementById('auto-stat-templates').textContent = d.total_templates || '-';
             } catch(e) {}
+        }
+
+        // ═══════════════════════════════════════════════
+        //   PUBLISHING PIPELINE & SETUP WIZARD
+        // ═══════════════════════════════════════════════
+
+        async function loadPublishStatus() {
+            try {
+                const r = await fetch(`${BASE}/api/admin/social/publish/status?admin_token=${encodeURIComponent(TOKEN)}`);
+                const d = await r.json();
+                ['twitter', 'linkedin', 'facebook'].forEach(p => {
+                    const s = d.accounts[p] || {};
+                    const dot = document.getElementById(`pipe-${p}-dot`);
+                    const label = document.getElementById(`pipe-${p}-status`);
+                    if (s.connected) {
+                        dot.className = 'w-3 h-3 rounded-full bg-green-500 mx-auto mb-2';
+                        label.textContent = s.account_name || 'Connected';
+                        label.className = 'text-xs text-green-400 mt-1';
+                    } else {
+                        dot.className = 'w-3 h-3 rounded-full bg-red-500 mx-auto mb-2';
+                        label.textContent = 'Not connected';
+                        label.className = 'text-xs text-slate-400 mt-1';
+                    }
+                });
+                document.getElementById('pipe-queue-count').textContent = d.queue.scheduled || 0;
+                document.getElementById('pipe-published-count').textContent = d.queue.published || 0;
+                document.getElementById('pipe-failed-count').textContent = d.queue.failed || 0;
+            } catch(e) { console.error('Pipeline status error:', e); }
+        }
+
+        async function testAccount(accountId) {
+            const el = document.getElementById(`test-result-${accountId}`);
+            el.textContent = 'Testing...';
+            el.className = 'text-xs mb-2 text-yellow-400';
+            el.classList.remove('hidden');
+            try {
+                const r = await fetch(`${BASE}/api/admin/social/accounts/test`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ admin_token: TOKEN, account_id: accountId })
+                });
+                const d = await r.json();
+                if (d.success) {
+                    el.textContent = `Connected as ${d.username || d.name || 'verified'}`;
+                    el.className = 'text-xs mb-2 text-green-400';
+                    showToast(`${d.platform} connected successfully!`);
+                } else {
+                    el.textContent = d.error || 'Connection failed';
+                    el.className = 'text-xs mb-2 text-red-400';
+                }
+            } catch(e) {
+                el.textContent = 'Network error';
+                el.className = 'text-xs mb-2 text-red-400';
+            }
+        }
+
+        async function showSetupGuide(platform) {
+            try {
+                const r = await fetch(`${BASE}/api/admin/social/setup-guide?admin_token=${encodeURIComponent(TOKEN)}`);
+                const d = await r.json();
+                const guide = d.platforms[platform];
+                if (!guide) return;
+
+                const overlay = document.createElement('div');
+                overlay.className = 'fixed inset-0 z-50 flex items-center justify-center modal-bg';
+                overlay.onclick = (e) => { if(e.target === overlay) overlay.remove(); };
+                overlay.innerHTML = `<div class="glass rounded-2xl p-8 w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto">
+                    <h3 class="text-lg font-bold text-white mb-2">${escapeHtml(guide.name)} Setup Guide</h3>
+                    <p class="text-xs text-slate-400 mb-4">Free tier: ${escapeHtml(guide.free_tier)}</p>
+                    <div class="space-y-3 mb-6">
+                        ${guide.steps.map(s => `<div class="flex gap-3 text-xs">
+                            <span class="text-blue-400 font-bold min-w-[20px]">${s.substring(0, 2)}</span>
+                            <span class="text-slate-300">${escapeHtml(s.substring(3))}</span>
+                        </div>`).join('')}
+                    </div>
+                    <div class="flex gap-3 mb-4">
+                        <a href="${escapeHtml(guide.signup_url)}" target="_blank" rel="noopener" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">Create Account &#8599;</a>
+                        <a href="${escapeHtml(guide.developer_url)}" target="_blank" rel="noopener" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">Developer Portal &#8599;</a>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mb-4">After creating your account & app, click the button below to add your API credentials:</p>
+                    <div class="flex gap-3">
+                        <button onclick="this.closest('.fixed').remove(); showAccountModal({platform:'${platform}'})" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">Add ${escapeHtml(guide.name)} Credentials</button>
+                        <button onclick="this.closest('.fixed').remove()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-xs font-medium transition">Close</button>
+                    </div>
+                </div>`;
+                document.body.appendChild(overlay);
+            } catch(e) { showToast('Error loading setup guide'); }
+        }
+
+        async function publishPostNow(postId) {
+            if (!confirm('Publish this post now to connected platforms?')) return;
+            const r = await fetch(`${BASE}/api/admin/social/publish`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ admin_token: TOKEN, post_id: postId })
+            });
+            const d = await r.json();
+            if (d.success) {
+                showToast('Post published successfully!');
+                loadSocialPosts();
+                loadPublishStatus();
+            } else {
+                const errors = (d.results || []).filter(r => !r.success).map(r => r.error).join('; ');
+                showToast('Publish failed: ' + (errors || 'Unknown error'));
+            }
         }
     </script>
 </body>
