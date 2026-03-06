@@ -76,10 +76,8 @@ ADMIN_HTML = """<!DOCTYPE html>
             <!-- Tab Navigation -->
             <div class="flex gap-1 border-b border-slate-700/50 mb-6 overflow-x-auto">
                 <button onclick="switchTab('licenses')" class="tab-btn active px-5 py-3 text-sm font-medium text-slate-400" data-tab="licenses">&#128272; Licenses</button>
-                <button onclick="switchTab('users')" class="tab-btn px-5 py-3 text-sm font-medium text-slate-400" data-tab="users">&#128101; Portal Users</button>
                 <button onclick="switchTab('social')" class="tab-btn px-5 py-3 text-sm font-medium text-slate-400" data-tab="social">&#128226; Social Media</button>
-                <button onclick="switchTab('smtp')" class="tab-btn px-5 py-3 text-sm font-medium text-slate-400" data-tab="smtp">&#128231; SMTP Settings</button>
-                <button onclick="switchTab('admins')" class="tab-btn px-5 py-3 text-sm font-medium text-slate-400" data-tab="admins">&#128737; Admins</button>
+                <button onclick="switchTab('admin')" class="tab-btn px-5 py-3 text-sm font-medium text-slate-400" data-tab="admin">&#128737; Administrators</button>
             </div>
 
             <!-- TAB: Licenses -->
@@ -114,30 +112,120 @@ ADMIN_HTML = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <!-- TAB: Portal Users -->
-            <div id="tab-users" class="tab-content hidden">
-                <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-                    <h2 class="text-xl font-bold text-white">Portal Users</h2>
-                    <button onclick="loadPortalUsers()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition">&#8635; Refresh</button>
+            <!-- TAB: Administrators (combined Portal Users, Admin Users, SMTP) -->
+            <div id="tab-admin" class="tab-content hidden">
+                <!-- Admin Sub-tabs -->
+                <div class="flex gap-2 mb-6">
+                    <button onclick="switchAdminSub('users')" class="admin-sub-btn active px-4 py-2 text-xs font-medium text-white bg-blue-600/30 border border-blue-500/30 rounded-lg" data-sub="users">&#128101; Portal Users</button>
+                    <button onclick="switchAdminSub('admins')" class="admin-sub-btn px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800/30 border border-slate-700/30 rounded-lg" data-sub="admins">&#128737; Admin Users</button>
+                    <button onclick="switchAdminSub('smtp')" class="admin-sub-btn px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800/30 border border-slate-700/30 rounded-lg" data-sub="smtp">&#128231; SMTP Settings</button>
                 </div>
-                <div class="glass rounded-xl overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead>
-                                <tr class="border-b border-slate-700/50 text-left text-slate-400">
-                                    <th class="px-5 py-3 font-medium">Name</th>
-                                    <th class="px-5 py-3 font-medium">Email</th>
-                                    <th class="px-5 py-3 font-medium">Company</th>
-                                    <th class="px-5 py-3 font-medium">Licenses</th>
-                                    <th class="px-5 py-3 font-medium">Status</th>
-                                    <th class="px-5 py-3 font-medium">Registered</th>
-                                    <th class="px-5 py-3 font-medium text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="users-table-body">
-                                <tr><td colspan="7" class="px-5 py-10 text-center text-slate-500">Click Refresh to load users</td></tr>
-                            </tbody>
-                        </table>
+
+                <!-- Sub: Portal Users -->
+                <div id="admin-sub-users" class="admin-sub-content">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                        <h2 class="text-xl font-bold text-white">Portal Users</h2>
+                        <button onclick="loadPortalUsers()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition">&#8635; Refresh</button>
+                    </div>
+                    <div class="glass rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-700/50 text-left text-slate-400">
+                                        <th class="px-5 py-3 font-medium">Name</th>
+                                        <th class="px-5 py-3 font-medium">Email</th>
+                                        <th class="px-5 py-3 font-medium">Company</th>
+                                        <th class="px-5 py-3 font-medium">Licenses</th>
+                                        <th class="px-5 py-3 font-medium">Status</th>
+                                        <th class="px-5 py-3 font-medium">Registered</th>
+                                        <th class="px-5 py-3 font-medium text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body">
+                                    <tr><td colspan="7" class="px-5 py-10 text-center text-slate-500">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub: SMTP Settings -->
+                <div id="admin-sub-smtp" class="admin-sub-content hidden">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                        <h2 class="text-xl font-bold text-white">SMTP / Email Settings</h2>
+                    </div>
+                    <div class="max-w-xl">
+                        <div class="glass rounded-2xl p-8 space-y-5">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-xs text-slate-400 block mb-1.5">SMTP Host</label>
+                                    <input id="smtp-host" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-slate-400 block mb-1.5">SMTP Port</label>
+                                    <input id="smtp-port" type="number" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-400 block mb-1.5">SMTP Username</label>
+                                <input id="smtp-user" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-400 block mb-1.5">SMTP Password</label>
+                                <input id="smtp-pass" type="password" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-xs text-slate-400 block mb-1.5">From Email</label>
+                                    <input id="smtp-from-email" type="email" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-slate-400 block mb-1.5">From Name</label>
+                                    <input id="smtp-from-name" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                                </div>
+                            </div>
+                            <div class="flex gap-3 pt-2">
+                                <button onclick="saveSmtp()" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition">Save Settings</button>
+                                <button onclick="testSmtp()" class="bg-slate-700 hover:bg-slate-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition">&#128231; Send Test Email</button>
+                            </div>
+                            <p id="smtp-result" class="text-sm hidden"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub: Admin Users -->
+                <div id="admin-sub-admins" class="admin-sub-content hidden">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                        <h2 class="text-xl font-bold text-white">Admin Users</h2>
+                        <button onclick="showAddAdminModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition flex items-center gap-2">
+                            <span class="text-lg">+</span> Add Admin
+                        </button>
+                    </div>
+                    <div class="glass rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-700/50 text-left text-slate-400">
+                                        <th class="px-5 py-3 font-medium">Name</th>
+                                        <th class="px-5 py-3 font-medium">Email</th>
+                                        <th class="px-5 py-3 font-medium">Role</th>
+                                        <th class="px-5 py-3 font-medium">Added</th>
+                                        <th class="px-5 py-3 font-medium text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admins-table-body">
+                                    <tr><td colspan="5" class="px-5 py-10 text-center text-slate-500">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="glass rounded-xl p-5 mt-6">
+                        <h3 class="text-white font-medium text-sm mb-2">Admin Token</h3>
+                        <p class="text-xs text-slate-400 mb-3">All admin operations use the shared admin token. Change it via the <code class="text-cyan-400">ADMIN_SECRET_TOKEN</code> environment variable.</p>
+                        <div class="flex items-center gap-3">
+                            <input id="admin-token-display" type="password" readonly class="flex-1 px-4 py-2 rounded-lg text-sm font-mono bg-slate-900/80 border border-slate-700 text-slate-300">
+                            <button onclick="toggleTokenVisibility()" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-white transition">&#128065;</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -244,86 +332,6 @@ ADMIN_HTML = """<!DOCTYPE html>
                         <button onclick="showAccountModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">+ Add Account</button>
                     </div>
                     <div id="accounts-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-                </div>
-            </div>
-
-            <!-- TAB: SMTP Settings -->
-            <div id="tab-smtp" class="tab-content hidden">
-                <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-                    <h2 class="text-xl font-bold text-white">SMTP / Email Settings</h2>
-                </div>
-                <div class="max-w-xl">
-                    <div class="glass rounded-2xl p-8 space-y-5">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="text-xs text-slate-400 block mb-1.5">SMTP Host</label>
-                                <input id="smtp-host" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                            </div>
-                            <div>
-                                <label class="text-xs text-slate-400 block mb-1.5">SMTP Port</label>
-                                <input id="smtp-port" type="number" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400 block mb-1.5">SMTP Username</label>
-                            <input id="smtp-user" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400 block mb-1.5">SMTP Password</label>
-                            <input id="smtp-pass" type="password" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="text-xs text-slate-400 block mb-1.5">From Email</label>
-                                <input id="smtp-from-email" type="email" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                            </div>
-                            <div>
-                                <label class="text-xs text-slate-400 block mb-1.5">From Name</label>
-                                <input id="smtp-from-name" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                            </div>
-                        </div>
-                        <div class="flex gap-3 pt-2">
-                            <button onclick="saveSmtp()" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition">Save Settings</button>
-                            <button onclick="testSmtp()" class="bg-slate-700 hover:bg-slate-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition">&#128231; Send Test Email</button>
-                        </div>
-                        <p id="smtp-result" class="text-sm hidden"></p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB: Admins -->
-            <div id="tab-admins" class="tab-content hidden">
-                <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-                    <h2 class="text-xl font-bold text-white">Admin Users</h2>
-                    <button onclick="showAddAdminModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition flex items-center gap-2">
-                        <span class="text-lg">+</span> Add Admin
-                    </button>
-                </div>
-                <div class="glass rounded-xl overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead>
-                                <tr class="border-b border-slate-700/50 text-left text-slate-400">
-                                    <th class="px-5 py-3 font-medium">Name</th>
-                                    <th class="px-5 py-3 font-medium">Email</th>
-                                    <th class="px-5 py-3 font-medium">Role</th>
-                                    <th class="px-5 py-3 font-medium">Added</th>
-                                    <th class="px-5 py-3 font-medium text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="admins-table-body">
-                                <tr><td colspan="5" class="px-5 py-10 text-center text-slate-500">Loading...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="glass rounded-xl p-5 mt-6">
-                    <h3 class="text-white font-medium text-sm mb-2">Admin Token</h3>
-                    <p class="text-xs text-slate-400 mb-3">All admin operations use the shared admin token. Change it via the <code class="text-cyan-400">ADMIN_SECRET_TOKEN</code> environment variable on Render.</p>
-                    <div class="flex items-center gap-3">
-                        <input id="admin-token-display" type="password" readonly class="flex-1 px-4 py-2 rounded-lg text-sm font-mono bg-slate-900/80 border border-slate-700 text-slate-300">
-                        <button onclick="toggleTokenVisibility()" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-white transition">&#128065;</button>
-                    </div>
                 </div>
             </div>
         </div>
@@ -608,10 +616,24 @@ ADMIN_HTML = """<!DOCTYPE html>
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById('tab-' + tab).classList.remove('hidden');
             document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active');
-            if (tab === 'users') loadPortalUsers();
-            if (tab === 'smtp') loadSmtpSettings();
-            if (tab === 'admins') loadAdmins();
+            if (tab === 'admin') { loadPortalUsers(); loadAdmins(); }
             if (tab === 'social') { loadSocialPosts(); loadSocialStats(); }
+        }
+
+        // Admin sub-tabs
+        function switchAdminSub(sub) {
+            document.querySelectorAll('.admin-sub-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.admin-sub-btn').forEach(el => {
+                el.classList.remove('active');
+                el.className = el.className.replace('text-white bg-blue-600/30 border-blue-500/30', 'text-slate-400 bg-slate-800/30 border-slate-700/30');
+            });
+            document.getElementById('admin-sub-' + sub).classList.remove('hidden');
+            const btn = document.querySelector(`.admin-sub-btn[data-sub="${sub}"]`);
+            btn.className = btn.className.replace('text-slate-400 bg-slate-800/30 border-slate-700/30', 'text-white bg-blue-600/30 border-blue-500/30');
+            btn.classList.add('active');
+            if (sub === 'users') loadPortalUsers();
+            if (sub === 'admins') loadAdmins();
+            if (sub === 'smtp') loadSmtpSettings();
         }
 
         // Stats
