@@ -13,6 +13,9 @@ import secrets
 import os
 import json
 import urllib.parse
+import asyncio
+import random
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -338,6 +341,11 @@ async def startup_event():
     load_portal_users()
     load_social_posts()
     load_social_accounts()
+
+    # Start social media automation background loop
+    global _automation_task
+    _automation_task = asyncio.create_task(_automation_loop())
+    print("[Startup] Social media automation scheduler started")
 
     # Sync small static files from GCS → local STATIC_DIR (logos, etc.)
     # Large installer files (.deb/.exe) are served via GCS signed URL redirect
@@ -2164,6 +2172,565 @@ async def social_stats(admin_token: str = "", token: str = ""):
         "published": published,
         "active_accounts": accounts,
     }
+
+
+# ══════════════════════════════════════════════════════════════════
+#   SOCIAL MEDIA AUTOMATION ENGINE
+# ══════════════════════════════════════════════════════════════════
+
+AUTOMATION_CONFIG_FILE = os.path.join(DATA_DIR, "social_automation.json")
+AUTOMATION_LOG_FILE = os.path.join(DATA_DIR, "automation_log.json")
+
+# SA ISP/FNO target audience content library
+SA_ISP_CONTENT_LIBRARY = {
+    "product_highlights": [
+        "Network downtime costing your ISP revenue? Connexa gives you real-time alerts before your customers even notice. #NetworkMonitoring #SouthAfricaISP",
+        "Managing hundreds of CPEs across your fibre network? Connexa auto-discovers and monitors every device. No manual setup needed. #FibreNetwork #FTTH",
+        "Your NOC team deserves better tools. Connexa provides unified monitoring for Mikrotik, Ubiquiti, Cambium & more — all in one dashboard. #NOC #ISPTools",
+        "Connexa monitors your entire network stack — from core routers to last-mile CPEs. Built for South African ISPs who demand uptime. #NetworkOps",
+        "Stop fighting with multiple monitoring tools. Connexa unifies SNMP, API polling & syslog into one clean interface. #NetworkManagement",
+        "Fibre rollouts growing faster than your monitoring can keep up? Connexa scales from 100 to 100,000 devices seamlessly. #FibreISP #Scalability",
+        "Bandwidth monitoring, traffic analysis, and alerting — Connexa does it all without the enterprise price tag. #AffordableNMS",
+        "Your customers expect 99.9% uptime. Connexa helps you deliver it with predictive monitoring and smart alerting. #ISPExcellence",
+    ],
+    "industry_insights": [
+        "South Africa's fibre-to-the-home market is growing 30%+ year-on-year. Is your monitoring infrastructure ready to scale? #FTTH #SAFibre",
+        "Load shedding affects network uptime across SA. Smart UPS monitoring integrated into Connexa helps you stay ahead. #LoadShedding #NetworkResilience",
+        "FNOs rolling out to new suburbs need real-time visibility. Connexa's auto-discovery means your NOC sees new sites instantly. #FNO #NetworkExpansion",
+        "The days of SSH-ing into routers one by one are over. Modern ISPs need centralised monitoring. That's Connexa. #ModernISP",
+        "According to industry data, 60% of ISP customer churn is caused by repeated connectivity issues. Proactive monitoring reduces churn. #CustomerRetention",
+        "South African ISPs serving rural areas face unique challenges — long backhaul links, power instability, remote sites. Connexa handles all of it. #RuralConnectivity",
+        "Multi-vendor networks are the reality for SA ISPs. Connexa speaks Mikrotik, Ubiquiti, Cambium, Huawei, and Cisco natively. #MultiVendor",
+    ],
+    "case_studies": [
+        "A Western Cape ISP reduced their mean-time-to-repair by 45% after deploying Connexa. Faster detection = faster resolution. #MTTR #CaseStudy",
+        "One of our Gauteng ISP customers monitors 5,000+ CPEs with Connexa — and their NOC team is just 3 people. #Efficiency #ISP",
+        "A KZN fibre operator cut their truck rolls by 30% using Connexa's remote diagnostics. Less windscreen time, more uptime. #FibreOps",
+        "After deploying Connexa, a small-town ISP went from reactive firefighting to proactive monitoring. Customer complaints dropped 50%. #ProactiveMonitoring",
+    ],
+    "tips_and_education": [
+        "ISP tip: Set up tiered alerting in Connexa — critical alerts go to SMS, warnings to email, info to Slack. Don't wake your team for non-issues. #ISPTips",
+        "Best practice: Monitor your backhaul links separately from access networks. Connexa's network grouping makes this easy. #NetworkBestPractice",
+        "Pro tip: Use Connexa's bandwidth trending to plan capacity upgrades before your links hit 80%. Prevention > firefighting. #CapacityPlanning",
+        "Monitoring tip: Track packet loss and jitter on voice circuits separately. Connexa's SLA monitoring feature handles this automatically. #VoIP #QoS",
+        "Don't just monitor uptime — monitor performance. A link that's 'up' but at 99% utilisation is about to become a problem. #PerformanceMonitoring",
+    ],
+    "announcements": [
+        "Connexa v5.2.8 is live! New features include enhanced wireless monitoring, improved dashboard performance, and multi-vendor support. Download now at connexify.co.za #Connexa #Update",
+        "We're proudly South African, building network monitoring tools designed for African ISPs and FNOs. 🇿🇦 #ProudlySA #MadeInSA",
+        "Free trial available — experience Connexa's full network monitoring suite with no commitment. Visit connexify.co.za to get started. #FreeTrial",
+        "Connexa now supports SNMP v3 with full encryption for security-conscious ISPs. Upgrade today. #Security #SNMPv3",
+    ],
+}
+
+SA_ISP_HASHTAGS = [
+    "#SouthAfricaISP", "#SAFibre", "#FTTH", "#NetworkMonitoring", "#ISP",
+    "#FNO", "#Connexa", "#NetworkManagement", "#FibreNetwork", "#NOC",
+    "#MadeInSA", "#AfricanTech", "#TechSA", "#ISPTools", "#NetworkOps",
+    "#Mikrotik", "#Ubiquiti", "#Cambium", "#ProudlySA", "#DigitalSA",
+]
+
+SA_ISP_TARGET_HANDLES = {
+    "twitter": [
+        "@Vumatel", "@OpenserveZA", "@MetroFibre", "@DFA_Africa",
+        "@Frogfoot_Net", "@OctotelFibre", "@LinkAfricaZA",
+        "@ABORSSA", "@MwebSA", "@WebafrSA", "@CoolIdeasZA",
+    ],
+    "linkedin": [
+        "Vumatel", "Openserve", "MetroFibre Networx", "DFA",
+        "Frogfoot Networks", "Octotel", "Link Africa",
+        "ISPA South Africa", "Internet Solutions", "Liquid Intelligent Technologies",
+    ],
+}
+
+# Default automation settings
+DEFAULT_AUTOMATION_CONFIG = {
+    "enabled": False,
+    "platforms": ["twitter", "linkedin"],
+    "posting_schedule": {
+        "min_hours_between_posts": 8,     # Minimum gap between posts (anti-spam)
+        "max_posts_per_day": 2,           # Hard cap per platform per day
+        "max_posts_per_week": 8,          # Weekly cap per platform
+        "posting_windows": [              # Only post during business/engagement hours (SAST)
+            {"start": "07:00", "end": "09:00"},   # Morning commute
+            {"start": "12:00", "end": "13:00"},   # Lunch break
+            {"start": "17:00", "end": "19:00"},   # After work
+        ],
+        "excluded_days": [6],             # 0=Mon, 6=Sun — skip Sundays
+        "timezone_offset": 2,             # SAST = UTC+2
+    },
+    "content_mix": {
+        "product_highlights": 30,
+        "industry_insights": 25,
+        "tips_and_education": 20,
+        "case_studies": 15,
+        "announcements": 10,
+    },
+    "anti_spam": {
+        "min_content_variation": 0.6,     # Minimum difference ratio between consecutive posts
+        "max_hashtags_per_post": 4,       # Don't overload hashtags
+        "cooldown_after_burst": 24,       # Hours cooldown if 3+ posts in 12h window
+        "no_duplicate_content_days": 30,  # Don't repeat exact content within N days
+        "mention_frequency": 5,           # Only @mention targets every Nth post
+        "max_mentions_per_post": 1,       # Max @mentions per post
+    },
+    "campaign_name": "Connexa SA ISP Outreach",
+    "last_run": None,
+    "total_generated": 0,
+    "total_published": 0,
+}
+
+
+def load_automation_config():
+    try:
+        data = store.load_json(AUTOMATION_CONFIG_FILE)
+        if data:
+            # Merge with defaults so new fields are always present
+            merged = {**DEFAULT_AUTOMATION_CONFIG}
+            merged.update(data)
+            merged["posting_schedule"] = {**DEFAULT_AUTOMATION_CONFIG["posting_schedule"], **data.get("posting_schedule", {})}
+            merged["content_mix"] = {**DEFAULT_AUTOMATION_CONFIG["content_mix"], **data.get("content_mix", {})}
+            merged["anti_spam"] = {**DEFAULT_AUTOMATION_CONFIG["anti_spam"], **data.get("anti_spam", {})}
+            return merged
+    except Exception as e:
+        print(f"[Automation] Error loading config: {e}")
+    return {**DEFAULT_AUTOMATION_CONFIG}
+
+
+def save_automation_config(config):
+    store.save_json(AUTOMATION_CONFIG_FILE, config)
+
+
+def load_automation_log():
+    try:
+        data = store.load_json(AUTOMATION_LOG_FILE)
+        if isinstance(data, dict) and "entries" in data:
+            return data["entries"]
+        if isinstance(data, list):
+            return data
+    except Exception:
+        pass
+    return []
+
+
+def save_automation_log(entries):
+    # Keep only last 500 entries
+    store.save_json(AUTOMATION_LOG_FILE, {"entries": entries[-500:]})
+
+
+def _get_recent_post_content(days=30):
+    """Get content of posts from the last N days to avoid duplicates."""
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+    return [
+        p.get("content", "").lower().strip()
+        for p in SOCIAL_POSTS
+        if p.get("created_at", "") >= cutoff and p.get("content")
+    ]
+
+
+def _content_similarity(a: str, b: str) -> float:
+    """Simple word-overlap similarity ratio between two strings."""
+    words_a = set(a.lower().split())
+    words_b = set(b.lower().split())
+    if not words_a or not words_b:
+        return 0.0
+    intersection = words_a & words_b
+    union = words_a | words_b
+    return len(intersection) / len(union) if union else 0.0
+
+
+def _count_posts_in_window(hours=24, platform=None):
+    """Count posts created/scheduled in the last N hours for rate limiting."""
+    cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
+    count = 0
+    for p in SOCIAL_POSTS:
+        created = p.get("created_at", "")
+        if created >= cutoff:
+            if platform is None or platform in p.get("platforms", []):
+                count += 1
+    return count
+
+
+def _is_in_posting_window(config):
+    """Check if current time is within allowed posting windows (SAST)."""
+    tz_offset = config.get("posting_schedule", {}).get("timezone_offset", 2)
+    now = datetime.utcnow() + timedelta(hours=tz_offset)
+    current_time = now.strftime("%H:%M")
+    current_day = now.weekday()  # 0=Mon
+
+    excluded = config.get("posting_schedule", {}).get("excluded_days", [])
+    if current_day in excluded:
+        return False
+
+    windows = config.get("posting_schedule", {}).get("posting_windows", [])
+    for w in windows:
+        if w["start"] <= current_time <= w["end"]:
+            return True
+    return False
+
+
+def generate_automated_post(config, platform="twitter"):
+    """Generate a single post with anti-spam protections."""
+    anti_spam = config.get("anti_spam", {})
+    content_mix = config.get("content_mix", {})
+
+    # Check rate limits
+    sched = config.get("posting_schedule", {})
+    daily_count = _count_posts_in_window(24, platform)
+    if daily_count >= sched.get("max_posts_per_day", 2):
+        return None, "Daily post limit reached"
+
+    weekly_count = _count_posts_in_window(168, platform)
+    if weekly_count >= sched.get("max_posts_per_week", 8):
+        return None, "Weekly post limit reached"
+
+    # Cooldown check: if 3+ posts in last 12h, enforce cooldown
+    recent_12h = _count_posts_in_window(12, platform)
+    cooldown_hours = anti_spam.get("cooldown_after_burst", 24)
+    if recent_12h >= 3:
+        last_post_time = None
+        for p in sorted(SOCIAL_POSTS, key=lambda x: x.get("created_at", ""), reverse=True):
+            if platform in p.get("platforms", []):
+                last_post_time = p.get("created_at", "")
+                break
+        if last_post_time:
+            hours_since = (datetime.now() - datetime.fromisoformat(last_post_time)).total_seconds() / 3600
+            if hours_since < cooldown_hours:
+                return None, f"Cooldown active ({cooldown_hours - hours_since:.1f}h remaining)"
+
+    # Minimum gap between posts
+    min_gap = sched.get("min_hours_between_posts", 8)
+    last_auto = None
+    for p in sorted(SOCIAL_POSTS, key=lambda x: x.get("created_at", ""), reverse=True):
+        if p.get("auto_generated") and platform in p.get("platforms", []):
+            last_auto = p.get("created_at", "")
+            break
+    if last_auto:
+        hours_since = (datetime.now() - datetime.fromisoformat(last_auto)).total_seconds() / 3600
+        if hours_since < min_gap:
+            return None, f"Min gap not met ({min_gap - hours_since:.1f}h remaining)"
+
+    # Select content category based on weighted mix
+    categories = list(content_mix.keys())
+    weights = [content_mix.get(c, 10) for c in categories]
+    total_w = sum(weights)
+    weights = [w / total_w for w in weights]
+    category = random.choices(categories, weights=weights, k=1)[0]
+
+    # Get available content for that category
+    pool = SA_ISP_CONTENT_LIBRARY.get(category, [])
+    if not pool:
+        return None, f"No content in category {category}"
+
+    # Filter out recently used content
+    recent_content = _get_recent_post_content(anti_spam.get("no_duplicate_content_days", 30))
+    available = [c for c in pool if c.lower().strip() not in recent_content]
+    if not available:
+        # All content used recently — pick from full pool but ensure variation
+        available = pool
+
+    # Pick content and ensure it's different enough from last post
+    random.shuffle(available)
+    min_variation = anti_spam.get("min_content_variation", 0.6)
+    chosen = None
+    for candidate in available:
+        if recent_content:
+            similarity = max(_content_similarity(candidate, rc) for rc in recent_content[-5:])
+            if similarity < (1.0 - min_variation):
+                chosen = candidate
+                break
+        else:
+            chosen = candidate
+            break
+    if not chosen:
+        chosen = available[0]  # Fallback
+
+    # Add hashtags (limited)
+    max_tags = anti_spam.get("max_hashtags_per_post", 4)
+    # Extract existing hashtags from content
+    existing_tags = [w for w in chosen.split() if w.startswith("#")]
+    if len(existing_tags) < max_tags:
+        extra_needed = max_tags - len(existing_tags)
+        extra_pool = [t for t in SA_ISP_HASHTAGS if t not in chosen]
+        extra = random.sample(extra_pool, min(extra_needed, len(extra_pool)))
+        if extra:
+            chosen = chosen.rstrip() + " " + " ".join(extra)
+
+    # Occasionally @mention a target (controlled frequency)
+    mention_freq = anti_spam.get("mention_frequency", 5)
+    total_auto = sum(1 for p in SOCIAL_POSTS if p.get("auto_generated"))
+    if total_auto % mention_freq == 0 and total_auto > 0:
+        handles = SA_ISP_TARGET_HANDLES.get(platform, [])
+        if handles:
+            max_mentions = anti_spam.get("max_mentions_per_post", 1)
+            mentions = random.sample(handles, min(max_mentions, len(handles)))
+            chosen = chosen.rstrip() + " " + " ".join(mentions)
+
+    # Respect character limits
+    if platform == "twitter" and len(chosen) > 280:
+        # Trim hashtags to fit
+        words = chosen.split()
+        while len(" ".join(words)) > 280 and words:
+            if words[-1].startswith("#") or words[-1].startswith("@"):
+                words.pop()
+            else:
+                break
+        chosen = " ".join(words)
+
+    return {
+        "content": chosen,
+        "category": category,
+        "platform": platform,
+    }, None
+
+
+async def run_automation_cycle():
+    """Background task: check if automation should create posts."""
+    config = load_automation_config()
+    if not config.get("enabled"):
+        return
+
+    if not _is_in_posting_window(config):
+        return
+
+    log_entries = load_automation_log()
+    platforms = config.get("platforms", ["twitter", "linkedin"])
+    generated_count = 0
+
+    for platform in platforms:
+        # Check if we have an account for this platform
+        has_account = any(
+            a.get("platform") == platform and a.get("enabled", True)
+            for a in SOCIAL_ACCOUNTS
+        )
+
+        result, reason = generate_automated_post(config, platform)
+        if not result:
+            log_entries.append({
+                "timestamp": datetime.now().isoformat(),
+                "platform": platform,
+                "action": "skipped",
+                "reason": reason,
+            })
+            continue
+
+        # Determine schedule time — pick a random time within current posting window
+        tz_offset = config.get("posting_schedule", {}).get("timezone_offset", 2)
+        now_sast = datetime.utcnow() + timedelta(hours=tz_offset)
+        # Schedule for today or next valid window
+        sched_date = now_sast.strftime("%Y-%m-%d")
+        windows = config.get("posting_schedule", {}).get("posting_windows", [])
+        if windows:
+            # Pick a random window and random time within it
+            window = random.choice(windows)
+            start_h, start_m = map(int, window["start"].split(":"))
+            end_h, end_m = map(int, window["end"].split(":"))
+            start_mins = start_h * 60 + start_m
+            end_mins = end_h * 60 + end_m
+            random_mins = random.randint(start_mins, max(start_mins, end_mins - 1))
+            sched_time = f"{random_mins // 60:02d}:{random_mins % 60:02d}"
+        else:
+            sched_time = "09:00"
+
+        post = {
+            "id": secrets.token_hex(8),
+            "content": result["content"],
+            "platforms": [platform],
+            "scheduled_date": sched_date,
+            "scheduled_time": sched_time,
+            "status": "scheduled",
+            "image_url": "",
+            "hashtags": "",
+            "campaign": config.get("campaign_name", "Connexa SA ISP Outreach"),
+            "category": result["category"],
+            "auto_generated": True,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+        }
+
+        SOCIAL_POSTS.append(post)
+        generated_count += 1
+
+        status_note = " (no account configured — draft only)" if not has_account else ""
+        if not has_account:
+            post["status"] = "draft"
+
+        log_entries.append({
+            "timestamp": datetime.now().isoformat(),
+            "platform": platform,
+            "action": "generated",
+            "post_id": post["id"],
+            "category": result["category"],
+            "content_preview": result["content"][:80],
+            "scheduled": f"{sched_date} {sched_time}",
+            "note": status_note.strip(),
+        })
+
+    if generated_count > 0:
+        save_social_posts()
+        config["last_run"] = datetime.now().isoformat()
+        config["total_generated"] = config.get("total_generated", 0) + generated_count
+        save_automation_config(config)
+
+    save_automation_log(log_entries)
+
+
+# Background scheduler loop
+_automation_task = None
+
+async def _automation_loop():
+    """Runs every 30 minutes to check if posts should be auto-generated."""
+    while True:
+        try:
+            await run_automation_cycle()
+        except Exception as e:
+            print(f"[Automation] Error in cycle: {e}")
+        await asyncio.sleep(1800)  # Check every 30 minutes
+
+
+# ── Automation API endpoints ──
+
+@app.get("/api/admin/social/automation/config")
+async def get_automation_config(admin_token: str = "", token: str = ""):
+    tok = admin_token or token
+    if tok != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    return {"config": load_automation_config()}
+
+
+@app.post("/api/admin/social/automation/config")
+async def update_automation_config(request: Request):
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    config = load_automation_config()
+    # Update fields that were provided
+    updatable = [
+        "enabled", "platforms", "campaign_name",
+    ]
+    for field in updatable:
+        if field in body:
+            config[field] = body[field]
+
+    # Nested updates
+    if "posting_schedule" in body:
+        config["posting_schedule"].update(body["posting_schedule"])
+    if "content_mix" in body:
+        config["content_mix"].update(body["content_mix"])
+    if "anti_spam" in body:
+        config["anti_spam"].update(body["anti_spam"])
+
+    save_automation_config(config)
+    return {"success": True, "config": config}
+
+
+@app.post("/api/admin/social/automation/generate-now")
+async def trigger_automation_now(request: Request):
+    """Manually trigger one automation cycle regardless of posting window."""
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    config = load_automation_config()
+    platforms = body.get("platforms", config.get("platforms", ["twitter", "linkedin"]))
+    log_entries = load_automation_log()
+    generated = []
+
+    for platform in platforms:
+        result, reason = generate_automated_post(config, platform)
+        if not result:
+            generated.append({"platform": platform, "success": False, "reason": reason})
+            continue
+
+        tz_offset = config.get("posting_schedule", {}).get("timezone_offset", 2)
+        now_sast = datetime.utcnow() + timedelta(hours=tz_offset)
+        sched_date = now_sast.strftime("%Y-%m-%d")
+        windows = config.get("posting_schedule", {}).get("posting_windows", [])
+        if windows:
+            window = random.choice(windows)
+            start_h, start_m = map(int, window["start"].split(":"))
+            end_h, end_m = map(int, window["end"].split(":"))
+            random_mins = random.randint(start_h * 60 + start_m, max(start_h * 60 + start_m, end_h * 60 + end_m - 1))
+            sched_time = f"{random_mins // 60:02d}:{random_mins % 60:02d}"
+        else:
+            sched_time = "09:00"
+
+        post = {
+            "id": secrets.token_hex(8),
+            "content": result["content"],
+            "platforms": [platform],
+            "scheduled_date": sched_date,
+            "scheduled_time": sched_time,
+            "status": "scheduled",
+            "image_url": "",
+            "hashtags": "",
+            "campaign": config.get("campaign_name", "Connexa SA ISP Outreach"),
+            "category": result["category"],
+            "auto_generated": True,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+        }
+        SOCIAL_POSTS.append(post)
+        generated.append({"platform": platform, "success": True, "post_id": post["id"], "content_preview": result["content"][:100]})
+        log_entries.append({
+            "timestamp": datetime.now().isoformat(),
+            "platform": platform,
+            "action": "manual_generate",
+            "post_id": post["id"],
+            "category": result["category"],
+            "content_preview": result["content"][:80],
+        })
+
+    if any(g["success"] for g in generated):
+        save_social_posts()
+        config["total_generated"] = config.get("total_generated", 0) + sum(1 for g in generated if g["success"])
+        config["last_run"] = datetime.now().isoformat()
+        save_automation_config(config)
+    save_automation_log(log_entries)
+
+    return {"success": True, "generated": generated}
+
+
+@app.get("/api/admin/social/automation/log")
+async def get_automation_log(admin_token: str = "", token: str = "", limit: int = 50):
+    tok = admin_token or token
+    if tok != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    entries = load_automation_log()
+    return {"entries": entries[-limit:]}
+
+
+@app.get("/api/admin/social/automation/content-library")
+async def get_content_library(admin_token: str = "", token: str = ""):
+    tok = admin_token or token
+    if tok != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    return {
+        "categories": {k: len(v) for k, v in SA_ISP_CONTENT_LIBRARY.items()},
+        "total_templates": sum(len(v) for v in SA_ISP_CONTENT_LIBRARY.values()),
+        "hashtag_pool": len(SA_ISP_HASHTAGS),
+        "target_handles": {k: len(v) for k, v in SA_ISP_TARGET_HANDLES.items()},
+    }
+
+
+@app.post("/api/admin/social/automation/preview")
+async def preview_automation(request: Request):
+    """Preview what the next auto-generated posts would look like."""
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    config = load_automation_config()
+    count = min(body.get("count", 5), 10)
+    platform = body.get("platform", "twitter")
+    previews = []
+    for _ in range(count):
+        result, reason = generate_automated_post(config, platform)
+        if result:
+            previews.append(result)
+
+    return {"previews": previews, "platform": platform}
 
 
 @app.get("/admin", response_class=HTMLResponse)

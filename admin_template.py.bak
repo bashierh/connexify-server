@@ -76,8 +76,10 @@ ADMIN_HTML = """<!DOCTYPE html>
             <!-- Tab Navigation -->
             <div class="flex gap-1 border-b border-slate-700/50 mb-6 overflow-x-auto">
                 <button onclick="switchTab('licenses')" class="tab-btn active px-5 py-3 text-sm font-medium text-slate-400" data-tab="licenses">&#128272; Licenses</button>
+                <button onclick="switchTab('users')" class="tab-btn px-5 py-3 text-sm font-medium text-slate-400" data-tab="users">&#128101; Portal Users</button>
                 <button onclick="switchTab('social')" class="tab-btn px-5 py-3 text-sm font-medium text-slate-400" data-tab="social">&#128226; Social Media</button>
-                <button onclick="switchTab('admin')" class="tab-btn px-5 py-3 text-sm font-medium text-slate-400" data-tab="admin">&#128737; Administrators</button>
+                <button onclick="switchTab('smtp')" class="tab-btn px-5 py-3 text-sm font-medium text-slate-400" data-tab="smtp">&#128231; SMTP Settings</button>
+                <button onclick="switchTab('admins')" class="tab-btn px-5 py-3 text-sm font-medium text-slate-400" data-tab="admins">&#128737; Admins</button>
             </div>
 
             <!-- TAB: Licenses -->
@@ -112,120 +114,30 @@ ADMIN_HTML = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <!-- TAB: Administrators (combined Portal Users, Admin Users, SMTP) -->
-            <div id="tab-admin" class="tab-content hidden">
-                <!-- Admin Sub-tabs -->
-                <div class="flex gap-2 mb-6">
-                    <button onclick="switchAdminSub('users')" class="admin-sub-btn active px-4 py-2 text-xs font-medium text-white bg-blue-600/30 border border-blue-500/30 rounded-lg" data-sub="users">&#128101; Portal Users</button>
-                    <button onclick="switchAdminSub('admins')" class="admin-sub-btn px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800/30 border border-slate-700/30 rounded-lg" data-sub="admins">&#128737; Admin Users</button>
-                    <button onclick="switchAdminSub('smtp')" class="admin-sub-btn px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800/30 border border-slate-700/30 rounded-lg" data-sub="smtp">&#128231; SMTP Settings</button>
+            <!-- TAB: Portal Users -->
+            <div id="tab-users" class="tab-content hidden">
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                    <h2 class="text-xl font-bold text-white">Portal Users</h2>
+                    <button onclick="loadPortalUsers()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition">&#8635; Refresh</button>
                 </div>
-
-                <!-- Sub: Portal Users -->
-                <div id="admin-sub-users" class="admin-sub-content">
-                    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-                        <h2 class="text-xl font-bold text-white">Portal Users</h2>
-                        <button onclick="loadPortalUsers()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition">&#8635; Refresh</button>
-                    </div>
-                    <div class="glass rounded-xl overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
-                                <thead>
-                                    <tr class="border-b border-slate-700/50 text-left text-slate-400">
-                                        <th class="px-5 py-3 font-medium">Name</th>
-                                        <th class="px-5 py-3 font-medium">Email</th>
-                                        <th class="px-5 py-3 font-medium">Company</th>
-                                        <th class="px-5 py-3 font-medium">Licenses</th>
-                                        <th class="px-5 py-3 font-medium">Status</th>
-                                        <th class="px-5 py-3 font-medium">Registered</th>
-                                        <th class="px-5 py-3 font-medium text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="users-table-body">
-                                    <tr><td colspan="7" class="px-5 py-10 text-center text-slate-500">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Sub: SMTP Settings -->
-                <div id="admin-sub-smtp" class="admin-sub-content hidden">
-                    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-                        <h2 class="text-xl font-bold text-white">SMTP / Email Settings</h2>
-                    </div>
-                    <div class="max-w-xl">
-                        <div class="glass rounded-2xl p-8 space-y-5">
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="text-xs text-slate-400 block mb-1.5">SMTP Host</label>
-                                    <input id="smtp-host" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                                </div>
-                                <div>
-                                    <label class="text-xs text-slate-400 block mb-1.5">SMTP Port</label>
-                                    <input id="smtp-port" type="number" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                                </div>
-                            </div>
-                            <div>
-                                <label class="text-xs text-slate-400 block mb-1.5">SMTP Username</label>
-                                <input id="smtp-user" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                            </div>
-                            <div>
-                                <label class="text-xs text-slate-400 block mb-1.5">SMTP Password</label>
-                                <input id="smtp-pass" type="password" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="text-xs text-slate-400 block mb-1.5">From Email</label>
-                                    <input id="smtp-from-email" type="email" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                                </div>
-                                <div>
-                                    <label class="text-xs text-slate-400 block mb-1.5">From Name</label>
-                                    <input id="smtp-from-name" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                                </div>
-                            </div>
-                            <div class="flex gap-3 pt-2">
-                                <button onclick="saveSmtp()" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition">Save Settings</button>
-                                <button onclick="testSmtp()" class="bg-slate-700 hover:bg-slate-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition">&#128231; Send Test Email</button>
-                            </div>
-                            <p id="smtp-result" class="text-sm hidden"></p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Sub: Admin Users -->
-                <div id="admin-sub-admins" class="admin-sub-content hidden">
-                    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-                        <h2 class="text-xl font-bold text-white">Admin Users</h2>
-                        <button onclick="showAddAdminModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition flex items-center gap-2">
-                            <span class="text-lg">+</span> Add Admin
-                        </button>
-                    </div>
-                    <div class="glass rounded-xl overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
-                                <thead>
-                                    <tr class="border-b border-slate-700/50 text-left text-slate-400">
-                                        <th class="px-5 py-3 font-medium">Name</th>
-                                        <th class="px-5 py-3 font-medium">Email</th>
-                                        <th class="px-5 py-3 font-medium">Role</th>
-                                        <th class="px-5 py-3 font-medium">Added</th>
-                                        <th class="px-5 py-3 font-medium text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="admins-table-body">
-                                    <tr><td colspan="5" class="px-5 py-10 text-center text-slate-500">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="glass rounded-xl p-5 mt-6">
-                        <h3 class="text-white font-medium text-sm mb-2">Admin Token</h3>
-                        <p class="text-xs text-slate-400 mb-3">All admin operations use the shared admin token. Change it via the <code class="text-cyan-400">ADMIN_SECRET_TOKEN</code> environment variable.</p>
-                        <div class="flex items-center gap-3">
-                            <input id="admin-token-display" type="password" readonly class="flex-1 px-4 py-2 rounded-lg text-sm font-mono bg-slate-900/80 border border-slate-700 text-slate-300">
-                            <button onclick="toggleTokenVisibility()" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-white transition">&#128065;</button>
-                        </div>
+                <div class="glass rounded-xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-slate-700/50 text-left text-slate-400">
+                                    <th class="px-5 py-3 font-medium">Name</th>
+                                    <th class="px-5 py-3 font-medium">Email</th>
+                                    <th class="px-5 py-3 font-medium">Company</th>
+                                    <th class="px-5 py-3 font-medium">Licenses</th>
+                                    <th class="px-5 py-3 font-medium">Status</th>
+                                    <th class="px-5 py-3 font-medium">Registered</th>
+                                    <th class="px-5 py-3 font-medium text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <tr><td colspan="7" class="px-5 py-10 text-center text-slate-500">Click Refresh to load users</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -261,7 +173,6 @@ ADMIN_HTML = """<!DOCTYPE html>
                     <button onclick="switchSocialSub('posts')" class="social-sub-btn active px-4 py-2 text-xs font-medium text-white bg-blue-600/30 border border-blue-500/30 rounded-lg" data-sub="posts">Posts</button>
                     <button onclick="switchSocialSub('calendar')" class="social-sub-btn px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800/30 border border-slate-700/30 rounded-lg" data-sub="calendar">Calendar</button>
                     <button onclick="switchSocialSub('accounts')" class="social-sub-btn px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800/30 border border-slate-700/30 rounded-lg" data-sub="accounts">Accounts</button>
-                    <button onclick="switchSocialSub('automation')" class="social-sub-btn px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800/30 border border-slate-700/30 rounded-lg" data-sub="automation">&#9889; Automation</button>
                 </div>
 
                 <!-- Sub: Posts List -->
@@ -334,167 +245,84 @@ ADMIN_HTML = """<!DOCTYPE html>
                     </div>
                     <div id="accounts-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                 </div>
+            </div>
 
-                <!-- Sub: Automation -->
-                <div id="social-sub-automation" class="social-sub-content hidden">
-                    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <!-- TAB: SMTP Settings -->
+            <div id="tab-smtp" class="tab-content hidden">
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                    <h2 class="text-xl font-bold text-white">SMTP / Email Settings</h2>
+                </div>
+                <div class="max-w-xl">
+                    <div class="glass rounded-2xl p-8 space-y-5">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs text-slate-400 block mb-1.5">SMTP Host</label>
+                                <input id="smtp-host" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-400 block mb-1.5">SMTP Port</label>
+                                <input id="smtp-port" type="number" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                            </div>
+                        </div>
                         <div>
-                            <h2 class="text-xl font-bold text-white">SA ISP Outreach Automation</h2>
-                            <p class="text-xs text-slate-400 mt-1">Automated content targeting South African ISPs & FNOs with anti-spam protections</p>
+                            <label class="text-xs text-slate-400 block mb-1.5">SMTP Username</label>
+                            <input id="smtp-user" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
                         </div>
-                        <div class="flex gap-2">
-                            <button onclick="generateNow()" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">&#9889; Generate Now</button>
-                            <button onclick="previewAutomation()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-xs font-medium transition">&#128065; Preview</button>
+                        <div>
+                            <label class="text-xs text-slate-400 block mb-1.5">SMTP Password</label>
+                            <input id="smtp-pass" type="password" class="w-full px-4 py-2.5 rounded-lg text-sm">
                         </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs text-slate-400 block mb-1.5">From Email</label>
+                                <input id="smtp-from-email" type="email" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-400 block mb-1.5">From Name</label>
+                                <input id="smtp-from-name" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
+                            </div>
+                        </div>
+                        <div class="flex gap-3 pt-2">
+                            <button onclick="saveSmtp()" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition">Save Settings</button>
+                            <button onclick="testSmtp()" class="bg-slate-700 hover:bg-slate-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition">&#128231; Send Test Email</button>
+                        </div>
+                        <p id="smtp-result" class="text-sm hidden"></p>
                     </div>
+                </div>
+            </div>
 
-                    <!-- Automation Status Card -->
-                    <div class="glass rounded-xl p-6 mb-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="flex items-center gap-3">
-                                <div id="auto-status-dot" class="w-3 h-3 rounded-full bg-red-500"></div>
-                                <span id="auto-status-text" class="text-sm text-white font-medium">Disabled</span>
-                            </div>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <span class="text-xs text-slate-400">Enable Automation</span>
-                                <input type="checkbox" id="auto-enabled" onchange="toggleAutomation()" class="w-10 h-5 rounded-full appearance-none bg-slate-700 checked:bg-green-600 transition cursor-pointer relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:rounded-full after:bg-white after:transition checked:after:translate-x-5">
-                            </label>
-                        </div>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div>
-                                <p class="text-xs text-slate-400">Total Generated</p>
-                                <p id="auto-stat-generated" class="text-lg font-bold text-white">0</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-slate-400">Last Run</p>
-                                <p id="auto-stat-lastrun" class="text-xs font-medium text-slate-300">Never</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-slate-400">Content Library</p>
-                                <p id="auto-stat-templates" class="text-lg font-bold text-cyan-400">-</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-slate-400">Target Audience</p>
-                                <p class="text-lg font-bold text-purple-400">SA ISPs</p>
-                            </div>
-                        </div>
+            <!-- TAB: Admins -->
+            <div id="tab-admins" class="tab-content hidden">
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                    <h2 class="text-xl font-bold text-white">Admin Users</h2>
+                    <button onclick="showAddAdminModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition flex items-center gap-2">
+                        <span class="text-lg">+</span> Add Admin
+                    </button>
+                </div>
+                <div class="glass rounded-xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-slate-700/50 text-left text-slate-400">
+                                    <th class="px-5 py-3 font-medium">Name</th>
+                                    <th class="px-5 py-3 font-medium">Email</th>
+                                    <th class="px-5 py-3 font-medium">Role</th>
+                                    <th class="px-5 py-3 font-medium">Added</th>
+                                    <th class="px-5 py-3 font-medium text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admins-table-body">
+                                <tr><td colspan="5" class="px-5 py-10 text-center text-slate-500">Loading...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                        <!-- Schedule Settings -->
-                        <div class="glass rounded-xl p-6">
-                            <h3 class="text-white font-medium text-sm mb-4">&#128337; Posting Schedule</h3>
-                            <div class="space-y-4">
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label class="text-xs text-slate-400 block mb-1">Max Posts/Day (per platform)</label>
-                                        <input id="auto-max-daily" type="number" value="2" min="1" max="5" class="w-full px-3 py-2 rounded-lg text-sm">
-                                    </div>
-                                    <div>
-                                        <label class="text-xs text-slate-400 block mb-1">Max Posts/Week (per platform)</label>
-                                        <input id="auto-max-weekly" type="number" value="8" min="1" max="20" class="w-full px-3 py-2 rounded-lg text-sm">
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="text-xs text-slate-400 block mb-1">Min Hours Between Posts</label>
-                                    <input id="auto-min-gap" type="number" value="8" min="2" max="48" class="w-full px-3 py-2 rounded-lg text-sm">
-                                </div>
-                                <div>
-                                    <label class="text-xs text-slate-400 block mb-1">Active Platforms</label>
-                                    <div class="flex flex-wrap gap-2 mt-1">
-                                        <label class="flex items-center gap-1.5 text-xs text-slate-300"><input type="checkbox" id="auto-plat-twitter" checked class="w-3.5 h-3.5 rounded"> Twitter/X</label>
-                                        <label class="flex items-center gap-1.5 text-xs text-slate-300"><input type="checkbox" id="auto-plat-linkedin" checked class="w-3.5 h-3.5 rounded"> LinkedIn</label>
-                                        <label class="flex items-center gap-1.5 text-xs text-slate-300"><input type="checkbox" id="auto-plat-facebook" class="w-3.5 h-3.5 rounded"> Facebook</label>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="text-xs text-slate-400 block mb-2">Posting Windows (SAST)</label>
-                                    <div class="space-y-1 text-xs text-slate-300">
-                                        <div class="flex items-center gap-2 bg-slate-800/50 rounded px-3 py-1.5">&#9728; Morning: 07:00 – 09:00</div>
-                                        <div class="flex items-center gap-2 bg-slate-800/50 rounded px-3 py-1.5">&#9749; Lunch: 12:00 – 13:00</div>
-                                        <div class="flex items-center gap-2 bg-slate-800/50 rounded px-3 py-1.5">&#127751; Evening: 17:00 – 19:00</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Anti-Spam Settings -->
-                        <div class="glass rounded-xl p-6">
-                            <h3 class="text-white font-medium text-sm mb-4">&#128737; Anti-Spam Protections</h3>
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="text-xs text-slate-400 block mb-1">Max Hashtags Per Post</label>
-                                    <input id="auto-max-hashtags" type="number" value="4" min="1" max="8" class="w-full px-3 py-2 rounded-lg text-sm">
-                                </div>
-                                <div>
-                                    <label class="text-xs text-slate-400 block mb-1">Cooldown After Burst (hours)</label>
-                                    <input id="auto-cooldown" type="number" value="24" min="6" max="72" class="w-full px-3 py-2 rounded-lg text-sm">
-                                    <p class="text-[10px] text-slate-500 mt-1">If 3+ posts sent in 12h, wait this long before next</p>
-                                </div>
-                                <div>
-                                    <label class="text-xs text-slate-400 block mb-1">No Duplicate Content (days)</label>
-                                    <input id="auto-no-dupe-days" type="number" value="30" min="7" max="90" class="w-full px-3 py-2 rounded-lg text-sm">
-                                </div>
-                                <div>
-                                    <label class="text-xs text-slate-400 block mb-1">@Mention Target Every N Posts</label>
-                                    <input id="auto-mention-freq" type="number" value="5" min="3" max="20" class="w-full px-3 py-2 rounded-lg text-sm">
-                                    <p class="text-[10px] text-slate-500 mt-1">Only mention SA ISP handles occasionally to avoid spam flags</p>
-                                </div>
-                                <div class="bg-slate-800/50 rounded-lg p-3 mt-2">
-                                    <p class="text-xs text-slate-400 mb-2">&#9989; Active protections:</p>
-                                    <ul class="text-[10px] text-slate-500 space-y-1">
-                                        <li>• Content variation enforced (60% minimum difference)</li>
-                                        <li>• Rate limiting per platform per day/week</li>
-                                        <li>• Burst detection with automatic cooldown</li>
-                                        <li>• Posting only during peak engagement windows</li>
-                                        <li>• No posting on Sundays</li>
-                                        <li>• @Mentions throttled to avoid spam detection</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Content Mix -->
-                    <div class="glass rounded-xl p-6 mb-6">
-                        <h3 class="text-white font-medium text-sm mb-4">&#127912; Content Mix (weighted %)</h3>
-                        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-                            <div>
-                                <label class="text-xs text-slate-400 block mb-1">Product Highlights</label>
-                                <input id="auto-mix-product" type="number" value="30" min="0" max="100" class="w-full px-3 py-2 rounded-lg text-sm">
-                            </div>
-                            <div>
-                                <label class="text-xs text-slate-400 block mb-1">Industry Insights</label>
-                                <input id="auto-mix-industry" type="number" value="25" min="0" max="100" class="w-full px-3 py-2 rounded-lg text-sm">
-                            </div>
-                            <div>
-                                <label class="text-xs text-slate-400 block mb-1">Tips & Education</label>
-                                <input id="auto-mix-tips" type="number" value="20" min="0" max="100" class="w-full px-3 py-2 rounded-lg text-sm">
-                            </div>
-                            <div>
-                                <label class="text-xs text-slate-400 block mb-1">Case Studies</label>
-                                <input id="auto-mix-cases" type="number" value="15" min="0" max="100" class="w-full px-3 py-2 rounded-lg text-sm">
-                            </div>
-                            <div>
-                                <label class="text-xs text-slate-400 block mb-1">Announcements</label>
-                                <input id="auto-mix-announce" type="number" value="10" min="0" max="100" class="w-full px-3 py-2 rounded-lg text-sm">
-                            </div>
-                        </div>
-                        <div class="flex gap-3 mt-4">
-                            <button onclick="saveAutomationConfig()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg text-xs font-medium transition">Save Settings</button>
-                        </div>
-                        <p id="auto-save-result" class="text-xs mt-2 hidden"></p>
-                    </div>
-
-                    <!-- Automation Log -->
-                    <div class="glass rounded-xl p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-white font-medium text-sm">&#128220; Automation Log</h3>
-                            <button onclick="loadAutomationLog()" class="text-xs text-slate-400 hover:text-white">&#8635; Refresh</button>
-                        </div>
-                        <div id="auto-log" class="max-h-64 overflow-y-auto space-y-1">
-                            <p class="text-xs text-slate-500 text-center py-4">Loading...</p>
-                        </div>
+                </div>
+                <div class="glass rounded-xl p-5 mt-6">
+                    <h3 class="text-white font-medium text-sm mb-2">Admin Token</h3>
+                    <p class="text-xs text-slate-400 mb-3">All admin operations use the shared admin token. Change it via the <code class="text-cyan-400">ADMIN_SECRET_TOKEN</code> environment variable on Render.</p>
+                    <div class="flex items-center gap-3">
+                        <input id="admin-token-display" type="password" readonly class="flex-1 px-4 py-2 rounded-lg text-sm font-mono bg-slate-900/80 border border-slate-700 text-slate-300">
+                        <button onclick="toggleTokenVisibility()" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-white transition">&#128065;</button>
                     </div>
                 </div>
             </div>
@@ -780,24 +608,10 @@ ADMIN_HTML = """<!DOCTYPE html>
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById('tab-' + tab).classList.remove('hidden');
             document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active');
-            if (tab === 'admin') { loadPortalUsers(); loadAdmins(); }
+            if (tab === 'users') loadPortalUsers();
+            if (tab === 'smtp') loadSmtpSettings();
+            if (tab === 'admins') loadAdmins();
             if (tab === 'social') { loadSocialPosts(); loadSocialStats(); }
-        }
-
-        // Admin sub-tabs
-        function switchAdminSub(sub) {
-            document.querySelectorAll('.admin-sub-content').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('.admin-sub-btn').forEach(el => {
-                el.classList.remove('active');
-                el.className = el.className.replace('text-white bg-blue-600/30 border-blue-500/30', 'text-slate-400 bg-slate-800/30 border-slate-700/30');
-            });
-            document.getElementById('admin-sub-' + sub).classList.remove('hidden');
-            const btn = document.querySelector(`.admin-sub-btn[data-sub="${sub}"]`);
-            btn.className = btn.className.replace('text-slate-400 bg-slate-800/30 border-slate-700/30', 'text-white bg-blue-600/30 border-blue-500/30');
-            btn.classList.add('active');
-            if (sub === 'users') loadPortalUsers();
-            if (sub === 'admins') loadAdmins();
-            if (sub === 'smtp') loadSmtpSettings();
         }
 
         // Stats
@@ -1162,7 +976,6 @@ ADMIN_HTML = """<!DOCTYPE html>
             btn.classList.add('active');
             if (sub === 'calendar') renderCalendar();
             if (sub === 'accounts') loadSocialAccounts();
-            if (sub === 'automation') loadAutomationConfig();
         }
 
         // Social Stats
@@ -1567,220 +1380,6 @@ ADMIN_HTML = """<!DOCTYPE html>
                 body: JSON.stringify({ admin_token: TOKEN, account_id: id })
             });
             if ((await r.json()).success) { showToast('Account removed'); loadSocialAccounts(); }
-        }
-
-        // ═══════════════════════════════════════════════
-        //   AUTOMATION ENGINE UI
-        // ═══════════════════════════════════════════════
-
-        let autoConfig = null;
-
-        async function loadAutomationConfig() {
-            try {
-                const r = await fetch(`${BASE}/api/admin/social/automation/config?admin_token=${encodeURIComponent(TOKEN)}`);
-                const d = await r.json();
-                autoConfig = d.config;
-                renderAutomationConfig();
-                loadAutomationLog();
-                loadContentLibraryStats();
-            } catch(e) { console.error('Automation config error:', e); }
-        }
-
-        function renderAutomationConfig() {
-            if (!autoConfig) return;
-            const enabled = autoConfig.enabled;
-            document.getElementById('auto-enabled').checked = enabled;
-            document.getElementById('auto-status-dot').className = 'w-3 h-3 rounded-full ' + (enabled ? 'bg-green-500 animate-pulse' : 'bg-red-500');
-            document.getElementById('auto-status-text').textContent = enabled ? 'Active — Monitoring & Generating' : 'Disabled';
-            document.getElementById('auto-stat-generated').textContent = autoConfig.total_generated || 0;
-            document.getElementById('auto-stat-lastrun').textContent = autoConfig.last_run ? autoConfig.last_run.substring(0, 16).replace('T', ' ') : 'Never';
-
-            const sched = autoConfig.posting_schedule || {};
-            document.getElementById('auto-max-daily').value = sched.max_posts_per_day || 2;
-            document.getElementById('auto-max-weekly').value = sched.max_posts_per_week || 8;
-            document.getElementById('auto-min-gap').value = sched.min_hours_between_posts || 8;
-
-            const platforms = autoConfig.platforms || [];
-            document.getElementById('auto-plat-twitter').checked = platforms.includes('twitter');
-            document.getElementById('auto-plat-linkedin').checked = platforms.includes('linkedin');
-            document.getElementById('auto-plat-facebook').checked = platforms.includes('facebook');
-
-            const spam = autoConfig.anti_spam || {};
-            document.getElementById('auto-max-hashtags').value = spam.max_hashtags_per_post || 4;
-            document.getElementById('auto-cooldown').value = spam.cooldown_after_burst || 24;
-            document.getElementById('auto-no-dupe-days').value = spam.no_duplicate_content_days || 30;
-            document.getElementById('auto-mention-freq').value = spam.mention_frequency || 5;
-
-            const mix = autoConfig.content_mix || {};
-            document.getElementById('auto-mix-product').value = mix.product_highlights || 30;
-            document.getElementById('auto-mix-industry').value = mix.industry_insights || 25;
-            document.getElementById('auto-mix-tips').value = mix.tips_and_education || 20;
-            document.getElementById('auto-mix-cases').value = mix.case_studies || 15;
-            document.getElementById('auto-mix-announce').value = mix.announcements || 10;
-        }
-
-        async function toggleAutomation() {
-            const enabled = document.getElementById('auto-enabled').checked;
-            const r = await fetch(`${BASE}/api/admin/social/automation/config`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ admin_token: TOKEN, enabled })
-            });
-            const d = await r.json();
-            if (d.success) {
-                autoConfig = d.config;
-                renderAutomationConfig();
-                showToast(enabled ? 'Automation enabled' : 'Automation disabled');
-            }
-        }
-
-        async function saveAutomationConfig() {
-            const platforms = [];
-            if (document.getElementById('auto-plat-twitter').checked) platforms.push('twitter');
-            if (document.getElementById('auto-plat-linkedin').checked) platforms.push('linkedin');
-            if (document.getElementById('auto-plat-facebook').checked) platforms.push('facebook');
-
-            const body = {
-                admin_token: TOKEN,
-                platforms,
-                posting_schedule: {
-                    max_posts_per_day: parseInt(document.getElementById('auto-max-daily').value) || 2,
-                    max_posts_per_week: parseInt(document.getElementById('auto-max-weekly').value) || 8,
-                    min_hours_between_posts: parseInt(document.getElementById('auto-min-gap').value) || 8,
-                },
-                anti_spam: {
-                    max_hashtags_per_post: parseInt(document.getElementById('auto-max-hashtags').value) || 4,
-                    cooldown_after_burst: parseInt(document.getElementById('auto-cooldown').value) || 24,
-                    no_duplicate_content_days: parseInt(document.getElementById('auto-no-dupe-days').value) || 30,
-                    mention_frequency: parseInt(document.getElementById('auto-mention-freq').value) || 5,
-                },
-                content_mix: {
-                    product_highlights: parseInt(document.getElementById('auto-mix-product').value) || 30,
-                    industry_insights: parseInt(document.getElementById('auto-mix-industry').value) || 25,
-                    tips_and_education: parseInt(document.getElementById('auto-mix-tips').value) || 20,
-                    case_studies: parseInt(document.getElementById('auto-mix-cases').value) || 15,
-                    announcements: parseInt(document.getElementById('auto-mix-announce').value) || 10,
-                },
-            };
-
-            const r = await fetch(`${BASE}/api/admin/social/automation/config`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(body)
-            });
-            const d = await r.json();
-            const el = document.getElementById('auto-save-result');
-            if (d.success) {
-                autoConfig = d.config;
-                el.textContent = 'Settings saved';
-                el.className = 'text-xs mt-2 text-green-400';
-                showToast('Automation settings saved');
-            } else {
-                el.textContent = 'Error saving settings';
-                el.className = 'text-xs mt-2 text-red-400';
-            }
-            el.classList.remove('hidden');
-            setTimeout(() => el.classList.add('hidden'), 3000);
-        }
-
-        async function generateNow() {
-            const platforms = [];
-            if (document.getElementById('auto-plat-twitter').checked) platforms.push('twitter');
-            if (document.getElementById('auto-plat-linkedin').checked) platforms.push('linkedin');
-            if (document.getElementById('auto-plat-facebook').checked) platforms.push('facebook');
-            if (platforms.length === 0) { showToast('Select at least one platform'); return; }
-
-            const r = await fetch(`${BASE}/api/admin/social/automation/generate-now`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ admin_token: TOKEN, platforms })
-            });
-            const d = await r.json();
-            if (d.success) {
-                const count = d.generated.filter(g => g.success).length;
-                const skipped = d.generated.filter(g => !g.success);
-                if (count > 0) {
-                    showToast(`Generated ${count} post(s)`);
-                    loadSocialPosts();
-                    loadAutomationConfig();
-                } else if (skipped.length > 0) {
-                    showToast('Skipped: ' + skipped[0].reason);
-                }
-            }
-        }
-
-        async function previewAutomation() {
-            const r = await fetch(`${BASE}/api/admin/social/automation/preview`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ admin_token: TOKEN, count: 5, platform: 'twitter' })
-            });
-            const d = await r.json();
-            if (d.previews && d.previews.length > 0) {
-                let html = '<div class="space-y-3">';
-                d.previews.forEach((p, i) => {
-                    const catColors = {
-                        product_highlights: 'bg-blue-600/20 text-blue-400',
-                        industry_insights: 'bg-purple-600/20 text-purple-400',
-                        tips_and_education: 'bg-green-600/20 text-green-400',
-                        case_studies: 'bg-orange-600/20 text-orange-400',
-                        announcements: 'bg-cyan-600/20 text-cyan-400',
-                    };
-                    const catCls = catColors[p.category] || 'bg-slate-600/20 text-slate-400';
-                    html += `<div class="bg-slate-800/50 rounded-lg p-4 border border-slate-700/30">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="text-xs px-2 py-0.5 rounded ${catCls}">${(p.category || '').replace(/_/g, ' ')}</span>
-                            <span class="text-[10px] text-slate-500">${p.platform}</span>
-                        </div>
-                        <p class="text-xs text-slate-200">${escapeHtml(p.content)}</p>
-                    </div>`;
-                });
-                html += '</div>';
-                // Show in a simple overlay
-                const overlay = document.createElement('div');
-                overlay.className = 'fixed inset-0 z-50 flex items-center justify-center modal-bg';
-                overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-                overlay.innerHTML = `<div class="glass rounded-2xl p-8 w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto">
-                    <h3 class="text-lg font-bold text-white mb-4">Content Preview (next 5 posts)</h3>
-                    ${html}
-                    <div class="flex justify-end mt-4"><button onclick="this.closest('.fixed').remove()" class="bg-slate-700 hover:bg-slate-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition">Close</button></div>
-                </div>`;
-                document.body.appendChild(overlay);
-            } else {
-                showToast('No previews available — check rate limits');
-            }
-        }
-
-        async function loadAutomationLog() {
-            try {
-                const r = await fetch(`${BASE}/api/admin/social/automation/log?admin_token=${encodeURIComponent(TOKEN)}&limit=30`);
-                const d = await r.json();
-                const container = document.getElementById('auto-log');
-                const entries = (d.entries || []).reverse();
-                if (entries.length === 0) {
-                    container.innerHTML = '<p class="text-xs text-slate-500 text-center py-4">No automation activity yet. Enable automation or click Generate Now.</p>';
-                    return;
-                }
-                container.innerHTML = entries.map(e => {
-                    const actionColors = {
-                        generated: 'text-green-400', manual_generate: 'text-cyan-400',
-                        skipped: 'text-yellow-400', error: 'text-red-400',
-                    };
-                    const color = actionColors[e.action] || 'text-slate-400';
-                    const time = e.timestamp ? e.timestamp.substring(11, 16) : '';
-                    const date = e.timestamp ? e.timestamp.substring(0, 10) : '';
-                    return `<div class="flex items-start gap-2 text-xs py-1.5 border-b border-slate-800/50">
-                        <span class="text-slate-500 whitespace-nowrap">${date} ${time}</span>
-                        <span class="${color} font-medium min-w-[56px]">${e.action}</span>
-                        <span class="text-slate-400">${e.platform || '-'}</span>
-                        <span class="text-slate-500 truncate flex-1">${escapeHtml(e.content_preview || e.reason || e.note || '')}</span>
-                    </div>`;
-                }).join('');
-            } catch(e) { console.error('Log error:', e); }
-        }
-
-        async function loadContentLibraryStats() {
-            try {
-                const r = await fetch(`${BASE}/api/admin/social/automation/content-library?admin_token=${encodeURIComponent(TOKEN)}`);
-                const d = await r.json();
-                document.getElementById('auto-stat-templates').textContent = d.total_templates || '-';
-            } catch(e) {}
         }
     </script>
 </body>

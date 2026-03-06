@@ -2,8 +2,8 @@
   "licenses": {
     "DEMO1-DEMO2-DEMO3-DEMO4-DEMO5": {
       "key": "DEMO1-DEMO2-DEMO3-DEMO4-DEMO5",
-      "created_at": "2025-11-27T13:04:42.581745",
-      "expires": "2025-12-04T13:04:42.581782",
+      "created_at": "2026-02-28T07:29:39.223763",
+      "expires": "2026-03-07T07:29:39.223771",
       "active": true,
       "customer_email": "demo@example.com",
       "hardware_id": null,
@@ -25,13 +25,61 @@
     "P6PP9-JMNZ7-7Y675-MAF7U-4R38G": {
       "key": "P6PP9-JMNZ7-7Y675-MAF7U-4R38G",
       "created_at": "2025-12-09T17:03:03.112611",
-      "expires": "2026-12-15T17:03:03.112611",
+      "expires": "2026-12-15T23:59:59",
       "active": true,
-      "customer_email": "jacques@wheeler.co.za",
+      "customer_email": "0741008187j@gmail.com",
       "hardware_id": "5a862327db38c12bc9bf88fbb18f47d7dc9ce1e9dd5da65b2c12699f3f6f3849",
       "duration_days": 365,
       "is_demo": false,
-      "max_users": 1
+      "max_users": 1,
+      "updated_at": "2026-03-01T06:29:07.008806"
+    },
+    "GE33Q-GECKX-RV9GF-ABW4Y-5P5R4": {
+      "key": "GE33Q-GECKX-RV9GF-ABW4Y-5P5R4",
+      "created_at": "2026-02-28T11:44:47.632807",
+      "expires": "2026-03-07T11:44:47.632755",
+      "active": true,
+      "customer_email": "admin@connexify.co.za",
+      "hardware_id": null,
+      "duration_days": 7,
+      "is_demo": true,
+      "max_users": 1,
+      "payment": {
+        "method": "trial",
+        "customer_name": "Bashier Hendricks",
+        "company": "Pondering Protocols",
+        "completed_at": "2026-02-28T11:44:47.632816"
+      }
+    },
+    "CX9D2-WQGK5-R4TSN-WX922-77VHE": {
+      "key": "CX9D2-WQGK5-R4TSN-WX922-77VHE",
+      "created_at": "2026-03-02T05:32:07.517985",
+      "expires": "2027-03-02T05:32:07.517973",
+      "active": true,
+      "customer_email": "0741008187j@gmail.com",
+      "hardware_id": "2b78b0f7436a0ada9ec859ff6b02952ad2ebdb153761b11ac07288d4ea79df49",
+      "duration_days": 365,
+      "is_demo": false,
+      "max_users": 1,
+      "first_activation": "2026-03-02T05:32:39.387271",
+      "last_validated": "2026-03-05T09:49:21.823473"
+    },
+    "TQSCF-BWCPA-HZLAG-XYMZP-QZREL": {
+      "key": "TQSCF-BWCPA-HZLAG-XYMZP-QZREL",
+      "created_at": "2026-03-03T18:11:32.264983",
+      "expires": "2026-03-10T18:11:32.264908",
+      "active": true,
+      "customer_email": "nashyjacobs@gmail.com",
+      "hardware_id": null,
+      "duration_days": 7,
+      "is_demo": true,
+      "max_users": 1,
+      "payment": {
+        "method": "trial",
+        "customer_name": "Nashreen ",
+        "company": "Ignite Your light",
+        "completed_at": "2026-03-03T18:11:32.264992"
+      }
     }
   },
   "activations": {
