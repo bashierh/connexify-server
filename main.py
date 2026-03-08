@@ -2348,11 +2348,12 @@ async def oauth_linkedin_start(admin_token: str = "", token: str = ""):
     _OAUTH_STATES[state] = {"platform": "linkedin", "created": datetime.now().isoformat(), "admin_token": tok}
 
     redirect_uri = f"{SITE_URL}/api/admin/social/oauth/linkedin/callback"
+    # Request org scopes too — LinkedIn will only grant what the app has approved
     params = urllib.parse.urlencode({
         "response_type": "code",
         "client_id": LINKEDIN_CLIENT_ID,
         "redirect_uri": redirect_uri,
-        "scope": "openid profile w_member_social",
+        "scope": "openid profile w_member_social r_organization_social w_organization_social",
         "state": state,
     })
     return RedirectResponse(f"https://www.linkedin.com/oauth/v2/authorization?{params}")
@@ -2401,13 +2402,53 @@ async def oauth_linkedin_callback(code: str = "", state: str = "", error: str = 
             sub = data.get("sub", "")
             person_urn = f"urn:li:person:{sub}" if sub else ""
 
-        _save_oauth_account("linkedin", name or "LinkedIn Account", {
-            "access_token": access_token,
-            "page_id": person_urn,
-            "oauth_type": "oauth2",
-        })
+        # Try to find organization pages the user admins (needs r_organization_social)
+        org_urn = ""
+        org_name = ""
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                org_resp = await client.get(
+                    "https://api.linkedin.com/v2/organizationAcls",
+                    params={"q": "roleAssignee", "role": "ADMINISTRATOR", "state": "APPROVED", "count": 10},
+                    headers={"Authorization": f"Bearer {access_token}"},
+                )
+            if org_resp.status_code == 200:
+                org_elements = org_resp.json().get("elements", [])
+                if org_elements:
+                    org_urn = org_elements[0].get("organization", "")
+                    # Fetch org name
+                    if org_urn:
+                        org_id = org_urn.split(":")[-1]
+                        async with httpx.AsyncClient(timeout=15) as client:
+                            org_detail = await client.get(
+                                f"https://api.linkedin.com/v2/organizations/{org_id}",
+                                headers={"Authorization": f"Bearer {access_token}"},
+                            )
+                        if org_detail.status_code == 200:
+                            org_name = org_detail.json().get("localizedName", "")
+        except Exception:
+            pass  # Org access not available, fall back to personal
 
-        return _oauth_result_page("LinkedIn", True, f"Connected as {name}!" if name else "Connected successfully!")
+        if org_urn and org_name:
+            # Post as the Company Page
+            _save_oauth_account("linkedin", f"{org_name} (Company Page)", {
+                "access_token": access_token,
+                "page_id": org_urn,
+                "person_urn": person_urn,
+                "posting_as": "organization",
+                "oauth_type": "oauth2",
+            })
+            return _oauth_result_page("LinkedIn", True, f"Connected as Company Page: {org_name}!")
+        else:
+            # Post as personal profile
+            _save_oauth_account("linkedin", name or "LinkedIn Account", {
+                "access_token": access_token,
+                "page_id": person_urn,
+                "posting_as": "personal",
+                "oauth_type": "oauth2",
+            })
+            mode_note = " (posting as personal profile — apply for Community Management API to post as your Company Page)"
+            return _oauth_result_page("LinkedIn", True, f"Connected as {name}!{mode_note}" if name else "Connected successfully!")
 
     except Exception as e:
         return _oauth_result_page("LinkedIn", False, f"Error: {str(e)[:200]}")
@@ -3181,34 +3222,44 @@ def _twitter_oauth_signature(method, url, params, consumer_secret, token_secret)
 
 
 async def publish_to_twitter(content: str, account: dict) -> dict:
-    """Publish a tweet using Twitter API v2 with OAuth 1.0a."""
+    """Publish a tweet using Twitter API v2. Supports both OAuth 2.0 Bearer and OAuth 1.0a."""
     url = "https://api.twitter.com/2/tweets"
-    consumer_key = account["api_key"]
-    consumer_secret = account["api_secret"]
-    access_token = account["access_token"]
-    access_token_secret = account["access_token_secret"]
+    oauth_type = account.get("oauth_type", "")
 
-    # Build OAuth params
-    oauth_params = {
-        "oauth_consumer_key": consumer_key,
-        "oauth_nonce": secrets.token_hex(16),
-        "oauth_signature_method": "HMAC-SHA1",
-        "oauth_timestamp": str(int(_time.time())),
-        "oauth_token": access_token,
-        "oauth_version": "1.0",
-    }
-    sig = _twitter_oauth_signature("POST", url, oauth_params, consumer_secret, access_token_secret)
-    oauth_params["oauth_signature"] = sig
-    auth_header = "OAuth " + ", ".join(
-        f'{_urlparse.quote(k, safe="")}="{_urlparse.quote(v, safe="")}"'
-        for k, v in sorted(oauth_params.items())
-    )
+    if oauth_type == "oauth2_pkce":
+        # OAuth 2.0 Bearer token (from PKCE flow)
+        access_token = account["access_token"]
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(url, json={"text": content}, headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            })
+    else:
+        # Legacy OAuth 1.0a
+        consumer_key = account.get("api_key", "")
+        consumer_secret = account.get("api_secret", "")
+        access_token = account["access_token"]
+        access_token_secret = account.get("access_token_secret", "")
+        oauth_params = {
+            "oauth_consumer_key": consumer_key,
+            "oauth_nonce": secrets.token_hex(16),
+            "oauth_signature_method": "HMAC-SHA1",
+            "oauth_timestamp": str(int(_time.time())),
+            "oauth_token": access_token,
+            "oauth_version": "1.0",
+        }
+        sig = _twitter_oauth_signature("POST", url, oauth_params, consumer_secret, access_token_secret)
+        oauth_params["oauth_signature"] = sig
+        auth_header = "OAuth " + ", ".join(
+            f'{_urlparse.quote(k, safe="")}="{_urlparse.quote(v, safe="")}"'
+            for k, v in sorted(oauth_params.items())
+        )
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(url, json={"text": content}, headers={
+                "Authorization": auth_header,
+                "Content-Type": "application/json",
+            })
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(url, json={"text": content}, headers={
-            "Authorization": auth_header,
-            "Content-Type": "application/json",
-        })
     if resp.status_code in (200, 201):
         data = resp.json()
         tweet_id = data.get("data", {}).get("id", "")
@@ -3569,51 +3620,59 @@ async def get_setup_guide(admin_token: str = "", token: str = ""):
         "platforms": {
             "twitter": {
                 "name": "Twitter / X",
+                "needs_business_page": False,
+                "account_type": "Brand Account",
+                "account_description": "Your X account IS your brand. No separate business page needed.",
                 "signup_url": "https://x.com/i/flow/signup",
                 "developer_url": "https://developer.x.com/en/portal/dashboard",
+                "callback_url": f"{SITE_URL}/api/admin/social/oauth/twitter/callback",
                 "steps": [
-                    "1. Create a Twitter/X account at x.com/i/flow/signup",
-                    "2. Go to developer.x.com and sign up for a Developer account (Free tier)",
-                    "3. Create a Project and App in the Developer Portal",
-                    "4. Under 'User authentication settings', enable OAuth 2.0 with PKCE — set Type: Web App",
-                    f"5. Set Callback URL to: {SITE_URL}/api/admin/social/oauth/twitter/callback",
-                    "6. Copy the Client ID and Client Secret — paste them in the 'API App Credentials' section",
-                    "7. Click 'Connect Twitter' — the OAuth flow will handle the rest automatically",
+                    {"title": "Create your brand account", "description": "Sign up at x.com with your business name (e.g. @connexify). Add your logo, banner, and a short bio describing your business.", "action_url": "https://x.com/i/flow/signup", "action_label": "Create X Account"},
+                    {"title": "Create a Developer App", "description": "Sign up for X Developer access (Free tier = 1,500 tweets/month). Create a Project and an App inside it.", "action_url": "https://developer.x.com/en/portal/dashboard", "action_label": "Open Developer Portal"},
+                    {"title": "Configure OAuth", "description": "In your app settings: User authentication settings → Edit → Enable OAuth 2.0 → Type: Web App → Add the Callback URL shown below → Save.", "has_callback": True},
+                    {"title": "Enter credentials", "description": "Go to your app → Keys and Tokens. Copy the OAuth 2.0 Client ID and Client Secret.", "has_inputs": True, "inputs": [{"id": "client_id", "label": "Client ID", "placeholder": "Paste Client ID"}, {"id": "client_secret", "label": "Client Secret", "placeholder": "Paste Client Secret", "type": "password"}]},
+                    {"title": "Connect", "description": "Click Connect to authorize. A popup will open for you to approve access.", "is_connect": True},
                 ],
-                "fields": ["api_key", "api_secret", "access_token", "access_token_secret"],
-                "free_tier": "1,500 tweets/month (Free), 3,000 tweets/month (Basic $200/mo)",
+                "cost": "Free tier: 1,500 tweets/month. Basic ($200/mo): 3,000/month.",
+                "time_estimate": "~5 minutes",
             },
             "linkedin": {
                 "name": "LinkedIn",
-                "signup_url": "https://www.linkedin.com/signup",
+                "needs_business_page": True,
+                "account_type": "Company Page",
+                "account_description": "Create a Company Page for your business. Best for B2B visibility in the ISP/networking industry.",
+                "signup_url": "https://www.linkedin.com/company/setup/new/",
                 "developer_url": "https://www.linkedin.com/developers/apps",
+                "callback_url": f"{SITE_URL}/api/admin/social/oauth/linkedin/callback",
                 "steps": [
-                    "1. Create a LinkedIn account at linkedin.com/signup",
-                    "2. Create a LinkedIn Company Page for Connexify",
-                    "3. Go to linkedin.com/developers/apps and create a new app",
-                    "4. Under 'Auth' tab, add 'Share on LinkedIn' and 'Sign In with LinkedIn using OpenID Connect' products",
-                    f"5. Add Redirect URL: {SITE_URL}/api/admin/social/oauth/linkedin/callback",
-                    "6. Copy the Client ID and Client Secret — paste them in the 'API App Credentials' section",
-                    "7. Click 'Connect LinkedIn' — the OAuth flow will handle the rest automatically",
+                    {"title": "Create a LinkedIn account", "description": "You need a personal account to admin your Company Page. Sign up or log in.", "action_url": "https://www.linkedin.com/signup", "action_label": "Sign Up / Log In"},
+                    {"title": "Create your Company Page", "description": "Go to LinkedIn Company Page setup. Enter your company name, URL, industry (Telecommunications), and size.", "action_url": "https://www.linkedin.com/company/setup/new/", "action_label": "Create Company Page"},
+                    {"title": "Create a Developer App", "description": "Create a new app and link it to your Company Page. Under Products, request 'Share on LinkedIn' and 'Sign In with LinkedIn using OpenID Connect'. For Company Page posting, also request 'Community Management'.", "action_url": "https://www.linkedin.com/developers/apps", "action_label": "Create Developer App"},
+                    {"title": "Configure OAuth", "description": "Under your app's Auth tab, add the Redirect URL shown below.", "has_callback": True},
+                    {"title": "Enter credentials", "description": "Copy the Client ID and Client Secret from your app's Auth tab.", "has_inputs": True, "inputs": [{"id": "client_id", "label": "Client ID", "placeholder": "Paste Client ID"}, {"id": "client_secret", "label": "Client Secret", "placeholder": "Paste Client Secret", "type": "password"}]},
+                    {"title": "Connect", "description": "Click Connect to authorize. If Community Management is approved, posts will go to your Company Page. Otherwise, they'll post from your personal profile (still effective for business).", "is_connect": True},
                 ],
-                "fields": ["access_token", "page_id"],
-                "free_tier": "Unlimited posts (standard API — rate limited to 100 calls/day)",
+                "cost": "Free — unlimited posts, rate limited to 100 API calls/day.",
+                "time_estimate": "~10 minutes",
             },
             "facebook": {
                 "name": "Facebook",
-                "signup_url": "https://www.facebook.com/r.php",
+                "needs_business_page": True,
+                "account_type": "Business Page",
+                "account_description": "Create a Business Page. Posts go directly on your Page, not your personal profile.",
+                "signup_url": "https://www.facebook.com/pages/create",
                 "developer_url": "https://developers.facebook.com/apps/",
+                "callback_url": f"{SITE_URL}/api/admin/social/oauth/facebook/callback",
                 "steps": [
-                    "1. Create a Facebook account at facebook.com",
-                    "2. Create a Facebook Page for Connexify",
-                    "3. Go to developers.facebook.com and create a new app (Business type)",
-                    "4. Add 'Facebook Login for Business' product — set to Web",
-                    f"5. Add OAuth Redirect URI: {SITE_URL}/api/admin/social/oauth/facebook/callback",
-                    "6. Under Settings > Basic, copy the App ID and App Secret",
-                    "7. Paste them in the 'API App Credentials' section and click 'Connect Facebook'",
+                    {"title": "Create a Facebook account", "description": "You need a personal account to manage your Business Page. Log in or create one.", "action_url": "https://www.facebook.com/r.php", "action_label": "Sign Up / Log In"},
+                    {"title": "Create your Business Page", "description": "Create a Page with your business name. Choose category 'Internet Service Provider' or 'Technology Company'. Add logo, cover photo, and description.", "action_url": "https://www.facebook.com/pages/create", "action_label": "Create Business Page"},
+                    {"title": "Create a Developer App", "description": "Create a new app (type: Business). Add the 'Facebook Login for Business' product.", "action_url": "https://developers.facebook.com/apps/", "action_label": "Create Developer App"},
+                    {"title": "Configure OAuth", "description": "In your app → Facebook Login → Settings, add the OAuth redirect URI shown below.", "has_callback": True},
+                    {"title": "Enter credentials", "description": "Go to Settings → Basic. Copy the App ID and App Secret.", "has_inputs": True, "inputs": [{"id": "client_id", "label": "App ID", "placeholder": "Paste App ID"}, {"id": "client_secret", "label": "App Secret", "placeholder": "Paste App Secret", "type": "password"}]},
+                    {"title": "Connect", "description": "Click Connect and approve access. Your Business Page will be automatically detected and linked.", "is_connect": True},
                 ],
-                "fields": ["access_token", "page_id"],
-                "free_tier": "Unlimited posts with Page Access Token",
+                "cost": "Free — unlimited posts with Page Access Token.",
+                "time_estimate": "~10 minutes",
             },
         }
     }

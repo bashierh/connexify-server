@@ -328,85 +328,94 @@ ADMIN_HTML = """<!DOCTYPE html>
 
                 <!-- Sub: Accounts -->
                 <div id="social-sub-accounts" class="social-sub-content hidden">
-                    <!-- Publishing Pipeline Status -->
-                    <div class="glass rounded-xl p-6 mb-6 border border-slate-700/30">
-                        <div class="flex items-center justify-between mb-4">
-                            <h2 class="text-xl font-bold text-white">Publishing Pipeline</h2>
-                            <button onclick="loadPublishStatus()" class="text-xs text-slate-400 hover:text-white">&#8635; Refresh</button>
+                    <!-- Header -->
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Connect Your Platforms</h2>
+                            <p class="text-xs text-slate-400 mt-1">Follow the step-by-step wizard for each platform. Takes 5-10 minutes each.</p>
                         </div>
-                        <div id="pipeline-status" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            <div class="bg-slate-800/50 rounded-lg p-4 text-center">
-                                <div id="pipe-twitter-dot" class="w-3 h-3 rounded-full bg-red-500 mx-auto mb-2"></div>
-                                <p class="text-sm text-white font-medium">Twitter / X</p>
-                                <p id="pipe-twitter-status" class="text-xs text-slate-400 mt-1">Not connected</p>
-                                <button id="btn-connect-twitter" onclick="oauthConnect('twitter')" class="mt-2 bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-medium transition">Connect Twitter</button>
-                                <button onclick="showSetupGuide('twitter')" class="mt-1 text-[10px] text-slate-500 hover:text-slate-300 underline block mx-auto">Manual Setup</button>
-                            </div>
-                            <div class="bg-slate-800/50 rounded-lg p-4 text-center">
-                                <div id="pipe-linkedin-dot" class="w-3 h-3 rounded-full bg-red-500 mx-auto mb-2"></div>
-                                <p class="text-sm text-white font-medium">LinkedIn</p>
-                                <p id="pipe-linkedin-status" class="text-xs text-slate-400 mt-1">Not connected</p>
-                                <button id="btn-connect-linkedin" onclick="oauthConnect('linkedin')" class="mt-2 bg-blue-700 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-medium transition">Connect LinkedIn</button>
-                                <button onclick="showSetupGuide('linkedin')" class="mt-1 text-[10px] text-slate-500 hover:text-slate-300 underline block mx-auto">Manual Setup</button>
-                            </div>
-                            <div class="bg-slate-800/50 rounded-lg p-4 text-center">
-                                <div id="pipe-facebook-dot" class="w-3 h-3 rounded-full bg-red-500 mx-auto mb-2"></div>
-                                <p class="text-sm text-white font-medium">Facebook</p>
-                                <p id="pipe-facebook-status" class="text-xs text-slate-400 mt-1">Not connected</p>
-                                <button id="btn-connect-facebook" onclick="oauthConnect('facebook')" class="mt-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-medium transition">Connect Facebook</button>
-                                <button onclick="showSetupGuide('facebook')" class="mt-1 text-[10px] text-slate-500 hover:text-slate-300 underline block mx-auto">Manual Setup</button>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-4 text-xs text-slate-500 border-t border-slate-700/30 pt-3">
-                            <span>Queue: <strong id="pipe-queue-count" class="text-white">0</strong> scheduled</span>
+                        <div class="flex items-center gap-4 text-xs text-slate-500">
+                            <span>Queue: <strong id="pipe-queue-count" class="text-white">0</strong></span>
                             <span>Published: <strong id="pipe-published-count" class="text-white">0</strong></span>
                             <span>Failed: <strong id="pipe-failed-count" class="text-red-400">0</strong></span>
                         </div>
                     </div>
 
-                    <!-- OAuth App Configuration -->
-                    <div class="glass rounded-xl p-6 mb-6 border border-slate-700/30">
-                        <div class="flex items-center justify-between mb-4">
-                            <div>
-                                <h3 class="text-lg font-bold text-white">API App Credentials</h3>
-                                <p class="text-xs text-slate-400 mt-1">Configure your developer app credentials to enable one-click OAuth connection</p>
+                    <!-- Platform Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <!-- Twitter/X -->
+                        <div id="card-twitter" class="glass rounded-xl p-6 border border-slate-700/30 relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-full h-1 bg-slate-700"><div id="bar-twitter" class="h-full bg-sky-500 transition-all duration-500" style="width:0%"></div></div>
+                            <div class="flex items-center gap-3 mb-3 mt-1">
+                                <div class="w-11 h-11 rounded-xl bg-black flex items-center justify-center text-lg font-bold text-white">&#120143;</div>
+                                <div class="flex-1">
+                                    <p class="text-white font-medium text-sm">Twitter / X</p>
+                                    <p id="status-twitter" class="text-xs text-slate-400">Not connected</p>
+                                </div>
+                                <div id="dot-twitter" class="w-3 h-3 rounded-full bg-slate-600"></div>
                             </div>
-                            <button onclick="toggleOAuthConfig()" id="oauth-config-toggle" class="text-xs text-blue-400 hover:text-blue-300">&#9881; Configure Apps</button>
+                            <p class="text-xs text-slate-500 mb-1">&#128197; ~5 min &bull; Free tier</p>
+                            <p class="text-xs text-slate-500 mb-4">Post as your brand account. <strong class="text-slate-300">No business page needed</strong> &mdash; your account IS your brand.</p>
+                            <div id="actions-twitter">
+                                <button onclick="openSetupWizard('twitter')" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-xs font-medium transition">&#128295; Setup Twitter</button>
+                            </div>
                         </div>
-                        <div id="oauth-config-panel" class="hidden space-y-4">
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div class="bg-slate-800/60 rounded-lg p-4">
-                                    <p class="text-xs font-bold text-sky-400 mb-3">Twitter / X</p>
-                                    <input id="oauth-twitter-id" type="text" placeholder="Client ID" class="w-full px-3 py-2 rounded-lg text-xs mb-2">
-                                    <input id="oauth-twitter-secret" type="password" placeholder="Client Secret" class="w-full px-3 py-2 rounded-lg text-xs">
-                                    <p class="text-[10px] text-slate-500 mt-2">From <a href='https://developer.x.com/en/portal/dashboard' target='_blank' class='text-blue-400 underline'>developer.x.com</a> &rarr; OAuth 2.0 with PKCE</p>
+
+                        <!-- LinkedIn -->
+                        <div id="card-linkedin" class="glass rounded-xl p-6 border border-slate-700/30 relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-full h-1 bg-slate-700"><div id="bar-linkedin" class="h-full bg-blue-500 transition-all duration-500" style="width:0%"></div></div>
+                            <div class="flex items-center gap-3 mb-3 mt-1">
+                                <div class="w-11 h-11 rounded-xl bg-blue-700 flex items-center justify-center text-lg font-bold text-white">in</div>
+                                <div class="flex-1">
+                                    <p class="text-white font-medium text-sm">LinkedIn</p>
+                                    <p id="status-linkedin" class="text-xs text-slate-400">Not connected</p>
                                 </div>
-                                <div class="bg-slate-800/60 rounded-lg p-4">
-                                    <p class="text-xs font-bold text-blue-400 mb-3">LinkedIn</p>
-                                    <input id="oauth-linkedin-id" type="text" placeholder="Client ID" class="w-full px-3 py-2 rounded-lg text-xs mb-2">
-                                    <input id="oauth-linkedin-secret" type="password" placeholder="Client Secret" class="w-full px-3 py-2 rounded-lg text-xs">
-                                    <p class="text-[10px] text-slate-500 mt-2">From <a href='https://www.linkedin.com/developers/apps' target='_blank' class='text-blue-400 underline'>linkedin.com/developers</a></p>
-                                </div>
-                                <div class="bg-slate-800/60 rounded-lg p-4">
-                                    <p class="text-xs font-bold text-blue-400 mb-3">Facebook</p>
-                                    <input id="oauth-facebook-id" type="text" placeholder="App ID" class="w-full px-3 py-2 rounded-lg text-xs mb-2">
-                                    <input id="oauth-facebook-secret" type="password" placeholder="App Secret" class="w-full px-3 py-2 rounded-lg text-xs">
-                                    <p class="text-[10px] text-slate-500 mt-2">From <a href='https://developers.facebook.com/apps/' target='_blank' class='text-blue-400 underline'>developers.facebook.com</a></p>
-                                </div>
+                                <div id="dot-linkedin" class="w-3 h-3 rounded-full bg-slate-600"></div>
                             </div>
-                            <div class="flex gap-3">
-                                <button onclick="saveOAuthConfig()" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">Save API Credentials</button>
-                                <div id="oauth-config-status" class="flex items-center gap-2 text-xs text-slate-400"></div>
+                            <p class="text-xs text-slate-500 mb-1">&#128197; ~10 min &bull; Free</p>
+                            <p class="text-xs text-slate-500 mb-4">Best for B2B. <strong class="text-slate-300">Company Page required</strong> &mdash; posts to your page or your profile.</p>
+                            <div id="actions-linkedin">
+                                <button onclick="openSetupWizard('linkedin')" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-xs font-medium transition">&#128295; Setup LinkedIn</button>
+                            </div>
+                        </div>
+
+                        <!-- Facebook -->
+                        <div id="card-facebook" class="glass rounded-xl p-6 border border-slate-700/30 relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-full h-1 bg-slate-700"><div id="bar-facebook" class="h-full bg-blue-600 transition-all duration-500" style="width:0%"></div></div>
+                            <div class="flex items-center gap-3 mb-3 mt-1">
+                                <div class="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center text-lg font-bold text-white">f</div>
+                                <div class="flex-1">
+                                    <p class="text-white font-medium text-sm">Facebook</p>
+                                    <p id="status-facebook" class="text-xs text-slate-400">Not connected</p>
+                                </div>
+                                <div id="dot-facebook" class="w-3 h-3 rounded-full bg-slate-600"></div>
+                            </div>
+                            <p class="text-xs text-slate-500 mb-1">&#128197; ~10 min &bull; Free</p>
+                            <p class="text-xs text-slate-500 mb-4">Most reach. <strong class="text-slate-300">Business Page required</strong> &mdash; posts go directly on your Page.</p>
+                            <div id="actions-facebook">
+                                <button onclick="openSetupWizard('facebook')" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-xs font-medium transition">&#128295; Setup Facebook</button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Connected Accounts -->
-                    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-                        <h3 class="text-lg font-bold text-white">Connected Accounts</h3>
-                        <button onclick="showAccountModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">+ Add Manually</button>
+                    <!-- Quick Tips -->
+                    <div class="glass rounded-xl p-5 border border-slate-700/30">
+                        <h3 class="text-sm font-medium text-white mb-3">&#128161; Getting Started &mdash; Which platform first?</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-400">
+                            <div>
+                                <p class="text-sky-400 font-medium mb-1">Twitter/X &mdash; Easiest setup</p>
+                                <p>No business page needed. Create a brand account + free developer app. Best for quick updates and industry engagement.</p>
+                            </div>
+                            <div>
+                                <p class="text-blue-500 font-medium mb-1">Facebook &mdash; Broadest reach</p>
+                                <p>Create a Business Page, then connect via developer app. Great for reaching both businesses and consumers.</p>
+                            </div>
+                            <div>
+                                <p class="text-blue-400 font-medium mb-1">LinkedIn &mdash; Best for B2B</p>
+                                <p>Create a Company Page + developer app. Ideal for ISP industry, networking professionals, and B2B leads.</p>
+                            </div>
+                        </div>
                     </div>
-                    <div id="accounts-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                 </div>
 
                 <!-- Sub: Automation -->
@@ -777,44 +786,28 @@ ADMIN_HTML = """<!DOCTYPE html>
         </div>
     </div>
 
-    <!-- Social Account Modal -->
-    <div id="account-modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-bg">
-        <div class="glass rounded-2xl p-8 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
-            <h3 id="account-modal-title" class="text-lg font-bold text-white mb-6">Add Account</h3>
-            <input type="hidden" id="acc-edit-id" value="">
-            <div class="space-y-4">
-                <div>
-                    <label class="text-xs text-slate-400 block mb-1">Platform</label>
-                    <select id="acc-platform" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                        <option value="twitter">Twitter / X</option>
-                        <option value="linkedin">LinkedIn</option>
-                        <option value="facebook">Facebook</option>
-                        <option value="instagram">Instagram</option>
-                    </select>
+    <!-- Setup Wizard Modal -->
+    <div id="wizard-modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-bg">
+        <div class="glass rounded-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="p-6 border-b border-slate-700/30">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div id="wizard-icon" class="w-10 h-10 rounded-xl bg-black flex items-center justify-center text-lg font-bold text-white">&#120143;</div>
+                        <div>
+                            <h3 id="wizard-title" class="text-lg font-bold text-white">Setup</h3>
+                            <p id="wizard-subtitle" class="text-xs text-slate-400">Step 1</p>
+                        </div>
+                    </div>
+                    <button onclick="closeModal('wizard-modal')" class="text-slate-400 hover:text-white text-xl leading-none">&times;</button>
                 </div>
-                <div>
-                    <label class="text-xs text-slate-400 block mb-1">Account Name / Handle</label>
-                    <input id="acc-name" type="text" placeholder="@connexify" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                </div>
-                <div>
-                    <label class="text-xs text-slate-400 block mb-1">API Key / Client ID</label>
-                    <input id="acc-api-key" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                </div>
-                <div>
-                    <label class="text-xs text-slate-400 block mb-1">API Secret / Client Secret</label>
-                    <input id="acc-api-secret" type="password" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                </div>
-                <div>
-                    <label class="text-xs text-slate-400 block mb-1">Access Token</label>
-                    <input id="acc-access-token" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                </div>
-                <div>
-                    <label class="text-xs text-slate-400 block mb-1">Access Token Secret (Twitter) / Page ID (Facebook)</label>
-                    <input id="acc-extra" type="text" class="w-full px-4 py-2.5 rounded-lg text-sm">
-                </div>
-                <div class="flex gap-3 mt-4">
-                    <button onclick="saveAccount()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-sm font-medium transition">Save</button>
-                    <button onclick="closeModal('account-modal')" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-sm font-medium transition">Cancel</button>
+                <div id="wizard-progress" class="flex gap-1"></div>
+            </div>
+            <div id="wizard-body" class="p-6 overflow-y-auto flex-1"></div>
+            <div class="p-5 border-t border-slate-700/30 flex items-center justify-between">
+                <button id="wizard-back-btn" onclick="wizardBack()" class="px-5 py-2.5 rounded-lg text-sm text-slate-400 hover:text-white transition hidden">&larr; Back</button>
+                <div class="flex gap-3 ml-auto">
+                    <button onclick="closeModal('wizard-modal')" class="px-5 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm transition">Cancel</button>
+                    <button id="wizard-next-btn" onclick="wizardNext()" class="px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition">Next &rarr;</button>
                 </div>
             </div>
         </div>
@@ -1235,7 +1228,7 @@ ADMIN_HTML = """<!DOCTYPE html>
             btn.className = btn.className.replace('text-slate-400 bg-slate-800/30 border-slate-700/30', 'text-white bg-blue-600/30 border-blue-500/30');
             btn.classList.add('active');
             if (sub === 'calendar') renderCalendar();
-            if (sub === 'accounts') { loadSocialAccounts(); loadPublishStatus(); loadOAuthConfig(); }
+            if (sub === 'accounts') { loadSocialAccounts(); loadPublishStatus(); }
             if (sub === 'automation') loadAutomationConfig();
         }
 
@@ -1549,199 +1542,212 @@ ADMIN_HTML = """<!DOCTYPE html>
         function calendarPrev() { calendarDate.setMonth(calendarDate.getMonth() - 1); renderCalendar(); }
         function calendarNext() { calendarDate.setMonth(calendarDate.getMonth() + 1); renderCalendar(); }
 
-        // Social Accounts
+        // ═══════════════════════════════════════════════
+        //   SOCIAL ACCOUNTS — WIZARD-BASED SETUP
+        // ═══════════════════════════════════════════════
+
+        let wizardPlatform = '';
+        let wizardSteps = [];
+        let wizardStep = 0;
+
         async function loadSocialAccounts() {
             try {
                 const r = await fetch(`${BASE}/api/admin/social/accounts?admin_token=${encodeURIComponent(TOKEN)}`);
                 const d = await r.json();
                 socialAccounts = d.accounts || [];
-                renderAccounts();
-                updateConnectButtons();
+                renderPlatformCards();
             } catch(e) { console.error('Load accounts error:', e); }
         }
 
-        function renderAccounts() {
-            const container = document.getElementById('accounts-list');
-            if (socialAccounts.length === 0) {
-                container.innerHTML = '<div class="col-span-2 glass rounded-xl p-8 text-center text-slate-500">No social accounts configured. Click + Add Account to connect a platform.</div>';
-                return;
-            }
-            const platformColors = {
-                twitter: 'from-slate-800 to-slate-900 border-slate-600', linkedin: 'from-blue-900/30 to-blue-950/30 border-blue-700/30',
-                facebook: 'from-blue-800/20 to-blue-900/20 border-blue-600/30', instagram: 'from-purple-900/20 to-pink-900/20 border-purple-600/30'
-            };
-            const platformIcons = { twitter: '𝕏', linkedin: 'in', facebook: 'f', instagram: '📷' };
-            container.innerHTML = socialAccounts.map(a => {
-                const cls = platformColors[a.platform] || 'from-slate-800 to-slate-900 border-slate-600';
-                const icon = platformIcons[a.platform] || '?';
-                const enabledBadge = a.enabled !== false
-                    ? '<span class="text-[10px] bg-green-600/20 text-green-400 px-1.5 py-0.5 rounded">Active</span>'
-                    : '<span class="text-[10px] bg-red-600/20 text-red-400 px-1.5 py-0.5 rounded">Disabled</span>';
-                return `<div class="rounded-xl bg-gradient-to-br ${cls} border p-5">
-                    <div class="flex items-center justify-between mb-3">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-lg bg-slate-700/50 flex items-center justify-center text-lg font-bold text-white">${icon}</div>
-                            <div>
-                                <p class="text-white text-sm font-medium capitalize">${a.platform}</p>
-                                <p class="text-xs text-slate-400">${escapeHtml(a.account_name || '-')}</p>
-                            </div>
-                        </div>
-                        ${enabledBadge}
-                    </div>
-                    <div class="text-xs text-slate-500 mb-3">API Key: ${a.api_key ? '••••' + a.api_key.slice(-4) : 'Not set'}</div>
-                    <div id="test-result-${a.id}" class="text-xs mb-2 hidden"></div>
-                    <div class="flex gap-2">
-                        <button onclick="testAccount('${a.id}')" class="px-3 py-1.5 rounded-md bg-green-700/50 hover:bg-green-600/50 text-xs text-green-300 transition">&#9889; Test</button>
-                        <button onclick="editAccount('${a.id}')" class="px-3 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-xs text-white transition">Edit</button>
-                        <button onclick="deleteAccount('${a.id}')" class="px-3 py-1.5 rounded-md bg-red-700/50 hover:bg-red-600/50 text-xs text-red-300 transition">Remove</button>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-
-        // ═══════════════════════════════════════════════
-        //   OAUTH CONNECT FLOWS
-        // ═══════════════════════════════════════════════
-
-        let oauthConfig = {};
-
-        async function loadOAuthConfig() {
-            try {
-                const r = await fetch(`${BASE}/api/admin/social/oauth/config?admin_token=${encodeURIComponent(TOKEN)}`);
-                const d = await r.json();
-                oauthConfig = d;
-                updateConnectButtons();
-            } catch(e) { console.error('OAuth config load error:', e); }
-        }
-
-        function updateConnectButtons() {
+        function renderPlatformCards() {
             ['twitter', 'linkedin', 'facebook'].forEach(p => {
-                const btn = document.getElementById(`btn-connect-${p}`);
-                if (!btn) return;
-                const cfg = oauthConfig[p];
-                const connected = socialAccounts.some(a => a.platform === p && a.enabled !== false);
-                if (connected) {
-                    btn.textContent = `\\u2713 ${p.charAt(0).toUpperCase()+p.slice(1)} Connected`;
-                    btn.className = btn.className.replace(/bg-\\w+-\\d+/g, '').trim() + ' bg-green-700 cursor-default';
-                    btn.onclick = null;
-                } else if (cfg && cfg.configured) {
-                    btn.textContent = `Connect ${p.charAt(0).toUpperCase()+p.slice(1)}`;
-                    btn.onclick = () => oauthConnect(p);
-                    btn.style.opacity = '1';
+                const dot = document.getElementById(`dot-${p}`);
+                const status = document.getElementById(`status-${p}`);
+                const actions = document.getElementById(`actions-${p}`);
+                const bar = document.getElementById(`bar-${p}`);
+                if (!dot) return;
+                const acc = socialAccounts.find(a => a.platform === p && a.enabled !== false);
+                if (acc) {
+                    dot.className = 'w-3 h-3 rounded-full bg-green-500';
+                    status.textContent = acc.account_name || 'Connected';
+                    status.className = 'text-xs text-green-400';
+                    bar.style.width = '100%';
+                    actions.innerHTML = `<div class="flex gap-2">
+                        <button onclick="testPlatform('${p}')" class="flex-1 bg-green-700/50 hover:bg-green-600/50 text-green-300 py-2 rounded-lg text-xs font-medium transition">&#9889; Test</button>
+                        <button onclick="openSetupWizard('${p}')" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-xs font-medium transition">&#9881; Reconfigure</button>
+                        <button onclick="disconnectPlatform('${p}')" class="px-3 py-2 rounded-lg bg-red-700/40 hover:bg-red-600/40 text-red-300 text-xs transition" title="Disconnect">&#10005;</button>
+                    </div>
+                    <p id="test-msg-${p}" class="text-xs mt-2 hidden"></p>`;
                 } else {
-                    btn.textContent = `Configure ${p.charAt(0).toUpperCase()+p.slice(1)} App`;
-                    btn.onclick = () => { toggleOAuthConfig(true); };
-                    btn.style.opacity = '0.7';
+                    dot.className = 'w-3 h-3 rounded-full bg-slate-600';
+                    status.textContent = 'Not connected';
+                    status.className = 'text-xs text-slate-400';
+                    bar.style.width = '0%';
+                    actions.innerHTML = `<button onclick="openSetupWizard('${p}')" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-xs font-medium transition">&#128295; Setup ${p.charAt(0).toUpperCase()+p.slice(1)}</button>`;
                 }
             });
         }
 
-        function oauthConnect(platform) {
-            const cfg = oauthConfig[platform];
-            if (!cfg || !cfg.configured) {
-                showToast('Configure API credentials first');
-                toggleOAuthConfig(true);
-                return;
-            }
-            // Open OAuth flow in popup window
-            const url = `${BASE}/api/admin/social/oauth/${platform}/start?admin_token=${encodeURIComponent(TOKEN)}`;
-            const popup = window.open(url, `oauth_${platform}`, 'width=600,height=700,scrollbars=yes');
-            // Poll for popup close and refresh accounts
-            const check = setInterval(() => {
-                if (popup && popup.closed) {
-                    clearInterval(check);
-                    loadSocialAccounts();
-                    loadPublishStatus();
-                    loadOAuthConfig();
-                    showToast(`${platform.charAt(0).toUpperCase()+platform.slice(1)} connection updated`);
-                }
-            }, 1000);
+        async function openSetupWizard(platform) {
+            wizardPlatform = platform;
+            wizardStep = 0;
+            try {
+                const r = await fetch(`${BASE}/api/admin/social/setup-guide?admin_token=${encodeURIComponent(TOKEN)}`);
+                const d = await r.json();
+                const guide = d.platforms[platform];
+                if (!guide) { showToast('Setup guide not available'); return; }
+                wizardSteps = guide.steps || [];
+                const icons = { twitter: '&#120143;', linkedin: 'in', facebook: 'f' };
+                const colors = { twitter: 'bg-black', linkedin: 'bg-blue-700', facebook: 'bg-blue-600' };
+                document.getElementById('wizard-icon').className = `w-10 h-10 rounded-xl ${colors[platform] || 'bg-slate-700'} flex items-center justify-center text-lg font-bold text-white`;
+                document.getElementById('wizard-icon').innerHTML = icons[platform] || '?';
+                document.getElementById('wizard-title').textContent = guide.name + ' Setup';
+                renderWizardStep();
+                document.getElementById('wizard-modal').classList.remove('hidden');
+                document.getElementById('wizard-modal').classList.add('flex');
+            } catch(e) { showToast('Error loading setup guide'); console.error(e); }
         }
 
-        function toggleOAuthConfig(forceOpen) {
-            const panel = document.getElementById('oauth-config-panel');
-            if (forceOpen || panel.classList.contains('hidden')) {
-                panel.classList.remove('hidden');
-                document.getElementById('oauth-config-toggle').textContent = '\\u25B2 Hide';
+        function renderWizardStep() {
+            const step = wizardSteps[wizardStep];
+            if (!step) return;
+            // Update subtitle
+            document.getElementById('wizard-subtitle').textContent = `Step ${wizardStep + 1} of ${wizardSteps.length}: ${step.title}`;
+            // Progress bar
+            document.getElementById('wizard-progress').innerHTML = wizardSteps.map((s, i) =>
+                `<div class="flex-1 h-1.5 rounded-full ${i <= wizardStep ? 'bg-blue-500' : 'bg-slate-700'} transition-all"></div>`
+            ).join('');
+            // Build body
+            let html = `<div class="space-y-4">`;
+            html += `<p class="text-sm text-slate-300">${escapeHtml(step.description)}</p>`;
+
+            if (step.action_url) {
+                html += `<a href="${escapeHtml(step.action_url)}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition">Open ${escapeHtml(step.title)} &#8599;</a>`;
+            }
+            if (step.has_callback) {
+                const cbUrl = step.callback_url || `${BASE}/api/admin/social/oauth/${wizardPlatform}/callback`;
+                html += `<div class="glass rounded-lg p-4 space-y-2">
+                    <p class="text-xs text-slate-400 font-medium">Callback URL (paste this into your app settings):</p>
+                    <div class="flex items-center gap-2">
+                        <code class="flex-1 text-xs bg-black/30 px-3 py-2 rounded text-green-400 break-all">${escapeHtml(cbUrl)}</code>
+                        <button onclick="navigator.clipboard.writeText('${escapeHtml(cbUrl)}').then(()=>showToast('Copied!'))" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded text-xs text-white transition">Copy</button>
+                    </div>
+                </div>`;
+            }
+            if (step.has_inputs && step.inputs) {
+                html += `<div class="space-y-3">`;
+                step.inputs.forEach(inp => {
+                    html += `<div>
+                        <label class="text-xs text-slate-400 mb-1 block">${escapeHtml(inp.label)}</label>
+                        <input id="wizard-input-${inp.key}" type="text" placeholder="${escapeHtml(inp.placeholder || '')}" class="w-full bg-slate-800/50 border border-slate-700/30 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-blue-500 focus:outline-none" />
+                    </div>`;
+                });
+                html += `</div>`;
+            }
+            if (step.is_connect) {
+                html += `<div class="glass rounded-lg p-5 text-center space-y-3">
+                    <p class="text-sm text-slate-300">Ready to connect? Click below to authorize with ${wizardPlatform.charAt(0).toUpperCase()+wizardPlatform.slice(1)}.</p>
+                    <button onclick="wizardConnect()" class="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg text-sm font-medium transition">&#9889; Connect ${wizardPlatform.charAt(0).toUpperCase()+wizardPlatform.slice(1)} Now</button>
+                    <p id="wizard-connect-status" class="text-xs text-slate-500"></p>
+                </div>`;
+            }
+            html += `</div>`;
+            document.getElementById('wizard-body').innerHTML = html;
+
+            // Buttons
+            document.getElementById('wizard-back-btn').classList.toggle('hidden', wizardStep === 0);
+            const nextBtn = document.getElementById('wizard-next-btn');
+            if (wizardStep >= wizardSteps.length - 1) {
+                nextBtn.textContent = 'Done';
+                nextBtn.onclick = () => { closeModal('wizard-modal'); loadSocialAccounts(); loadPublishStatus(); };
+            } else if (step.has_inputs) {
+                nextBtn.textContent = 'Save & Continue \\u2192';
+                nextBtn.onclick = () => { saveWizardCredentials(); };
             } else {
-                panel.classList.add('hidden');
-                document.getElementById('oauth-config-toggle').textContent = '\\u2699 Configure Apps';
+                nextBtn.innerHTML = 'Next &rarr;';
+                nextBtn.onclick = () => { wizardNext(); };
             }
         }
 
-        async function saveOAuthConfig() {
-            const body = {
-                admin_token: TOKEN,
-                twitter_client_id: document.getElementById('oauth-twitter-id').value.trim(),
-                twitter_client_secret: document.getElementById('oauth-twitter-secret').value.trim(),
-                linkedin_client_id: document.getElementById('oauth-linkedin-id').value.trim(),
-                linkedin_client_secret: document.getElementById('oauth-linkedin-secret').value.trim(),
-                facebook_app_id: document.getElementById('oauth-facebook-id').value.trim(),
-                facebook_app_secret: document.getElementById('oauth-facebook-secret').value.trim(),
-            };
-            // Remove empty values so we don't overwrite existing config
-            Object.keys(body).forEach(k => { if (k !== 'admin_token' && !body[k]) delete body[k]; });
+        function wizardNext() {
+            if (wizardStep < wizardSteps.length - 1) { wizardStep++; renderWizardStep(); }
+            else { closeModal('wizard-modal'); loadSocialAccounts(); loadPublishStatus(); }
+        }
+        function wizardBack() {
+            if (wizardStep > 0) { wizardStep--; renderWizardStep(); }
+        }
+
+        async function saveWizardCredentials() {
+            const step = wizardSteps[wizardStep];
+            if (!step || !step.inputs) { wizardNext(); return; }
+            const body = { admin_token: TOKEN };
+            step.inputs.forEach(inp => {
+                const val = document.getElementById(`wizard-input-${inp.key}`);
+                if (val && val.value.trim()) body[inp.key] = val.value.trim();
+            });
+            if (Object.keys(body).length <= 1) { showToast('Please fill in the credentials'); return; }
             try {
                 const r = await fetch(`${BASE}/api/admin/social/oauth/config`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
                 });
                 const d = await r.json();
                 if (d.success) {
-                    showToast(`Saved ${d.updated.length} credential(s)`);
-                    loadOAuthConfig();
-                    document.getElementById('oauth-config-status').innerHTML = '<span class=\"text-green-400\">\\u2713 Saved</span>';
+                    showToast('Credentials saved!');
+                    wizardNext();
                 } else {
-                    showToast('Error saving config');
+                    showToast('Error saving: ' + (d.error || 'Unknown'));
                 }
-            } catch(e) { showToast('Network error saving config'); }
+            } catch(e) { showToast('Network error saving credentials'); }
         }
 
-        function showAccountModal(acc) {
-            document.getElementById('account-modal-title').textContent = acc ? 'Edit Account' : 'Add Account';
-            document.getElementById('acc-edit-id').value = acc ? acc.id : '';
-            document.getElementById('acc-platform').value = acc ? acc.platform : 'twitter';
-            document.getElementById('acc-name').value = acc ? acc.account_name : '';
-            document.getElementById('acc-api-key').value = acc ? acc.api_key : '';
-            document.getElementById('acc-api-secret').value = acc ? (acc.api_secret || '') : '';
-            document.getElementById('acc-access-token').value = acc ? acc.access_token : '';
-            document.getElementById('acc-extra').value = acc ? (acc.access_token_secret || acc.page_id || '') : '';
-            document.getElementById('account-modal').classList.remove('hidden');
-            document.getElementById('account-modal').classList.add('flex');
+        function wizardConnect() {
+            const statusEl = document.getElementById('wizard-connect-status');
+            if (statusEl) statusEl.textContent = 'Opening authorization window...';
+            const url = `${BASE}/api/admin/social/oauth/${wizardPlatform}/start?admin_token=${encodeURIComponent(TOKEN)}`;
+            const popup = window.open(url, `oauth_${wizardPlatform}`, 'width=600,height=700,scrollbars=yes');
+            const check = setInterval(() => {
+                if (popup && popup.closed) {
+                    clearInterval(check);
+                    if (statusEl) { statusEl.textContent = 'Connected! Click Next to continue.'; statusEl.className = 'text-xs text-green-400'; }
+                    loadSocialAccounts();
+                    showToast(`${wizardPlatform.charAt(0).toUpperCase()+wizardPlatform.slice(1)} connected!`);
+                }
+            }, 1000);
         }
 
-        function editAccount(id) {
-            const acc = socialAccounts.find(a => a.id === id);
-            if (acc) showAccountModal(acc);
+        async function testPlatform(platform) {
+            const acc = socialAccounts.find(a => a.platform === platform && a.enabled !== false);
+            if (!acc) { showToast('No connected account for ' + platform); return; }
+            const msgEl = document.getElementById(`test-msg-${platform}`);
+            if (msgEl) { msgEl.textContent = 'Testing...'; msgEl.className = 'text-xs mt-2 text-yellow-400'; msgEl.classList.remove('hidden'); }
+            try {
+                const r = await fetch(`${BASE}/api/admin/social/accounts/test`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ admin_token: TOKEN, account_id: acc.id })
+                });
+                const d = await r.json();
+                if (d.success) {
+                    if (msgEl) { msgEl.textContent = `\\u2713 Connected as ${d.username || d.name || 'verified'}`; msgEl.className = 'text-xs mt-2 text-green-400'; }
+                    showToast(`${platform} connected successfully!`);
+                } else {
+                    if (msgEl) { msgEl.textContent = d.error || 'Connection failed'; msgEl.className = 'text-xs mt-2 text-red-400'; }
+                }
+            } catch(e) {
+                if (msgEl) { msgEl.textContent = 'Network error'; msgEl.className = 'text-xs mt-2 text-red-400'; }
+            }
         }
 
-        async function saveAccount() {
-            const platform = document.getElementById('acc-platform').value;
-            const body = {
-                admin_token: TOKEN,
-                id: document.getElementById('acc-edit-id').value || undefined,
-                platform,
-                account_name: document.getElementById('acc-name').value.trim(),
-                api_key: document.getElementById('acc-api-key').value.trim(),
-                api_secret: document.getElementById('acc-api-secret').value,
-                access_token: document.getElementById('acc-access-token').value.trim(),
-            };
-            const extra = document.getElementById('acc-extra').value.trim();
-            if (platform === 'twitter') body.access_token_secret = extra;
-            else body.page_id = extra;
-            const r = await fetch(`${BASE}/api/admin/social/accounts`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
-            });
-            const d = await r.json();
-            if (d.success) { closeModal('account-modal'); showToast('Account saved'); loadSocialAccounts(); }
-        }
-
-        async function deleteAccount(id) {
-            if (!confirm('Remove this social account?')) return;
-            const r = await fetch(`${BASE}/api/admin/social/accounts/delete`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ admin_token: TOKEN, account_id: id })
-            });
-            if ((await r.json()).success) { showToast('Account removed'); loadSocialAccounts(); }
+        async function disconnectPlatform(platform) {
+            const acc = socialAccounts.find(a => a.platform === platform && a.enabled !== false);
+            if (!acc) return;
+            if (!confirm(`Disconnect ${platform}? You can reconnect later via the wizard.`)) return;
+            try {
+                const r = await fetch(`${BASE}/api/admin/social/accounts/delete`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ admin_token: TOKEN, account_id: acc.id })
+                });
+                if ((await r.json()).success) { showToast(`${platform} disconnected`); loadSocialAccounts(); }
+            } catch(e) { showToast('Error disconnecting'); }
         }
 
         // ═══════════════════════════════════════════════
@@ -1960,89 +1966,20 @@ ADMIN_HTML = """<!DOCTYPE html>
         }
 
         // ═══════════════════════════════════════════════
-        //   PUBLISHING PIPELINE & SETUP WIZARD
+        //   PUBLISHING PIPELINE
         // ═══════════════════════════════════════════════
 
         async function loadPublishStatus() {
             try {
                 const r = await fetch(`${BASE}/api/admin/social/publish/status?admin_token=${encodeURIComponent(TOKEN)}`);
                 const d = await r.json();
-                ['twitter', 'linkedin', 'facebook'].forEach(p => {
-                    const s = d.accounts[p] || {};
-                    const dot = document.getElementById(`pipe-${p}-dot`);
-                    const label = document.getElementById(`pipe-${p}-status`);
-                    if (s.connected) {
-                        dot.className = 'w-3 h-3 rounded-full bg-green-500 mx-auto mb-2';
-                        label.textContent = s.account_name || 'Connected';
-                        label.className = 'text-xs text-green-400 mt-1';
-                    } else {
-                        dot.className = 'w-3 h-3 rounded-full bg-red-500 mx-auto mb-2';
-                        label.textContent = 'Not connected';
-                        label.className = 'text-xs text-slate-400 mt-1';
-                    }
-                });
-                document.getElementById('pipe-queue-count').textContent = d.queue.scheduled || 0;
-                document.getElementById('pipe-published-count').textContent = d.queue.published || 0;
-                document.getElementById('pipe-failed-count').textContent = d.queue.failed || 0;
+                const qEl = document.getElementById('pipe-queue-count');
+                const pEl = document.getElementById('pipe-published-count');
+                const fEl = document.getElementById('pipe-failed-count');
+                if (qEl) qEl.textContent = d.queue.scheduled || 0;
+                if (pEl) pEl.textContent = d.queue.published || 0;
+                if (fEl) fEl.textContent = d.queue.failed || 0;
             } catch(e) { console.error('Pipeline status error:', e); }
-        }
-
-        async function testAccount(accountId) {
-            const el = document.getElementById(`test-result-${accountId}`);
-            el.textContent = 'Testing...';
-            el.className = 'text-xs mb-2 text-yellow-400';
-            el.classList.remove('hidden');
-            try {
-                const r = await fetch(`${BASE}/api/admin/social/accounts/test`, {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ admin_token: TOKEN, account_id: accountId })
-                });
-                const d = await r.json();
-                if (d.success) {
-                    el.textContent = `Connected as ${d.username || d.name || 'verified'}`;
-                    el.className = 'text-xs mb-2 text-green-400';
-                    showToast(`${d.platform} connected successfully!`);
-                } else {
-                    el.textContent = d.error || 'Connection failed';
-                    el.className = 'text-xs mb-2 text-red-400';
-                }
-            } catch(e) {
-                el.textContent = 'Network error';
-                el.className = 'text-xs mb-2 text-red-400';
-            }
-        }
-
-        async function showSetupGuide(platform) {
-            try {
-                const r = await fetch(`${BASE}/api/admin/social/setup-guide?admin_token=${encodeURIComponent(TOKEN)}`);
-                const d = await r.json();
-                const guide = d.platforms[platform];
-                if (!guide) return;
-
-                const overlay = document.createElement('div');
-                overlay.className = 'fixed inset-0 z-50 flex items-center justify-center modal-bg';
-                overlay.onclick = (e) => { if(e.target === overlay) overlay.remove(); };
-                overlay.innerHTML = `<div class="glass rounded-2xl p-8 w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto">
-                    <h3 class="text-lg font-bold text-white mb-2">${escapeHtml(guide.name)} Setup Guide</h3>
-                    <p class="text-xs text-slate-400 mb-4">Free tier: ${escapeHtml(guide.free_tier)}</p>
-                    <div class="space-y-3 mb-6">
-                        ${guide.steps.map(s => `<div class="flex gap-3 text-xs">
-                            <span class="text-blue-400 font-bold min-w-[20px]">${s.substring(0, 2)}</span>
-                            <span class="text-slate-300">${escapeHtml(s.substring(3))}</span>
-                        </div>`).join('')}
-                    </div>
-                    <div class="flex gap-3 mb-4">
-                        <a href="${escapeHtml(guide.signup_url)}" target="_blank" rel="noopener" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">Create Account &#8599;</a>
-                        <a href="${escapeHtml(guide.developer_url)}" target="_blank" rel="noopener" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">Developer Portal &#8599;</a>
-                    </div>
-                    <p class="text-[10px] text-slate-500 mb-4">After creating your account & app, click the button below to add your API credentials:</p>
-                    <div class="flex gap-3">
-                        <button onclick="this.closest('.fixed').remove(); showAccountModal({platform:'${platform}'})" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">Add ${escapeHtml(guide.name)} Credentials</button>
-                        <button onclick="this.closest('.fixed').remove()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-xs font-medium transition">Close</button>
-                    </div>
-                </div>`;
-                document.body.appendChild(overlay);
-            } catch(e) { showToast('Error loading setup guide'); }
         }
 
         async function publishPostNow(postId) {
