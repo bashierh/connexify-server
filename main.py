@@ -3681,7 +3681,7 @@ async def get_setup_guide(admin_token: str = "", token: str = ""):
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard():
     """License management admin dashboard"""
-    return HTMLResponse(content=ADMIN_HTML)
+    return HTMLResponse(content=ADMIN_HTML, headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"})
 
 
 # ── Downloads page (legacy URL compat) ──
