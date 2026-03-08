@@ -1308,7 +1308,7 @@ _REMOVED_DOCS = """<!DOCTYPE html>
 <h2>Installation</h2>
 <h3>Linux (Debian/Ubuntu)</h3>
 <pre><code># Download the .deb package
-wget https://connexify-server.onrender.com/static/connexa___VERSION___amd64.deb
+wget https://www.connexify.co.za/static/connexa___VERSION___amd64.deb
 
 # Install
 sudo dpkg -i connexa___VERSION___amd64.deb

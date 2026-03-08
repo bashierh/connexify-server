@@ -1,10 +1,10 @@
-# Connexify License Server – Google Cloud Migration Guide
+# Connexify License Server – GCP Deployment Guide
 
 ## Architecture
 
 ```
                  ┌──────────────┐
-    Internet ───►│  Cloud Run   │◄──── Custom domain: license.connexify.co.za
+    Internet ───►│  Cloud Run   │◄──── Custom domain: www.connexify.co.za
                  │  (FastAPI)   │
                  └──────┬───────┘
                         │
@@ -96,33 +96,6 @@ curl $SERVICE_URL/api/health
 # Expected: {"status":"healthy","storage_backend":"gcs","gcs_bucket":"connexify-license-data",...}
 ```
 
-## Data Migration from Render
-
-### Automated (PowerShell)
-
-```powershell
-.\migrate-to-gcs.ps1
-```
-
-This script:
-1. Calls the Render API to export licenses and portal users
-2. Saves JSON files locally
-3. Uploads them to `gs://connexify-license-data/data/`
-
-### Manual
-
-```bash
-# Download from Render's persistent disk (via API)
-curl "https://connexify-server.onrender.com/api/admin/licenses?admin_token=connexify-admin-2026" -o licenses.json
-
-# Upload to GCS
-gsutil cp license_database.json gs://connexify-license-data/data/license_database.json
-gsutil cp portal_users.json     gs://connexify-license-data/data/portal_users.json
-
-# Migrate installer files
-gsutil cp connexa-setup.exe gs://connexify-license-data/static/connexa-setup.exe
-```
-
 ## Custom Domain Setup
 
 ```bash
@@ -130,10 +103,10 @@ gsutil cp connexa-setup.exe gs://connexify-license-data/static/connexa-setup.exe
 gcloud run domain-mappings create \
   --service connexify-server \
   --region africa-south1 \
-  --domain license.connexify.co.za
+  --domain www.connexify.co.za
 
 # Then update DNS:
-#   CNAME  license.connexify.co.za  →  ghs.googlehosted.com
+#   CNAME  www.connexify.co.za  →  ghs.googlehosted.com
 ```
 
 ## Environment Variables
@@ -157,9 +130,7 @@ gcloud run domain-mappings create \
 The `storage.py` module provides a transparent abstraction:
 
 - **When `GCS_BUCKET` is set** (Cloud Run): JSON data is loaded from and saved to `gs://<bucket>/data/`. Files go to `gs://<bucket>/static/`. Local filesystem (`/tmp`) acts as a cache.
-- **When `GCS_BUCKET` is empty** (Render / local dev): Uses local filesystem only. No GCS dependency needed.
-
-This means the **same codebase** works on Render, Cloud Run, and local development without any changes.
+- **When `GCS_BUCKET` is empty** (local dev): Uses local filesystem only. No GCS dependency needed.
 
 ## Cost Estimate
 
@@ -174,12 +145,3 @@ GCS:
 - 50,000 Class B operations (reads)
 
 **Expected cost: $0/month** for the current usage level (< 1000 requests/day).
-
-## Rollback
-
-To switch back to Render:
-1. Remove `GCS_BUCKET` env var (or set it empty)
-2. Push to the `bashierh/connexify-server` GitHub repo
-3. Render auto-deploys from the repo
-
-Both platforms can run simultaneously with the same codebase.

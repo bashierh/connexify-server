@@ -1,85 +1,89 @@
-# Connexify License Server + Website (Render Deployment)
+# Connexify License Server + Website (Google Cloud Run)
 
-Combined service that runs on [Render.com](https://render.com) free tier:
+Combined service deployed on **Google Cloud Run** (GCP):
 - **Connexify company website** at `/` (landing page, features, pricing, downloads)
 - **License API** at `/api/validate`, `/api/activate`, `/api/admin/*`
 - **Static file downloads** for DEB and EXE installers at `/static/`
+- **Social media management** at `/admin` (Twitter, LinkedIn, Facebook OAuth 2.0)
 
-## Quick Deploy to Render
+## Quick Deploy
 
-### 1. Create a GitHub repo for this folder
+### PowerShell (Windows)
+
+```powershell
+cd render-license-server
+.\deploy-gcp.ps1
+```
+
+### Bash (Linux / macOS)
 
 ```bash
 cd render-license-server
-git init
-git add .
-git commit -m "Connexify license server + website"
-git remote add origin https://github.com/YOUR_USERNAME/connexify-server.git
-git push -u origin main
+chmod +x deploy-gcp.sh
+./deploy-gcp.sh
 ```
 
-### 2. Deploy on Render
+### Prerequisites
 
-1. Go to [render.com](https://render.com) and sign up (free)
-2. Click **New** → **Web Service**
-3. Connect your GitHub repo
-4. Render will auto-detect the `render.yaml` — confirm the settings
-5. Set **Environment Variables** (click "Environment" tab):
+1. **Google Cloud account**: `ponderingprotocols@gmail.com`
+2. **gcloud CLI** installed: https://cloud.google.com/sdk/docs/install
+3. **Authenticated**: `gcloud auth login ponderingprotocols@gmail.com`
+4. **Project**: `connexify-license` (region: `africa-south1` — Johannesburg)
+
+### Environment Variables (set in Cloud Run)
 
 | Variable | Value |
 |----------|-------|
+| `GCS_BUCKET` | `connexify-license-data` |
 | `ADMIN_SECRET_TOKEN` | A strong secret for admin API access |
-| `SMTP_USER` | Your Gmail address (for license emails) |
-| `SMTP_PASSWORD` | Gmail App Password (not your regular password) |
-| `FROM_EMAIL` | Your sending email address |
+| `SMTP_HOST` | `mail.connexify.co.za` |
+| `SMTP_PORT` | `587` |
+| `SMTP_USER` | `admin@connexify.co.za` |
+| `SMTP_PASSWORD` | SMTP password |
+| `FROM_EMAIL` | `admin@connexify.co.za` |
+| `FROM_NAME` | `Connexify` |
+| `SITE_URL` | `https://www.connexify.co.za` |
+| `PAYFAST_MERCHANT_ID` | PayFast merchant ID |
+| `PAYFAST_MERCHANT_KEY` | PayFast key |
 
-6. Click **Create Web Service**
+Your site will be live at: `https://www.connexify.co.za`
 
-Your site will be live at: `https://connexify.co.za`
+## Upload Installer Files
 
-### 3. Upload installer files
-
-Installer files are too large for GitHub (>100MB each). Upload them after deployment using the admin API:
+Installer files are too large for GitHub (>100MB each). Upload them after deployment:
 
 ```bash
 # Upload DEB installer
-curl -X POST https://license-connexify.co.za/api/admin/upload-installer \
+curl -X POST https://www.connexify.co.za/api/admin/upload-installer \
   -F "admin_token=YOUR_TOKEN" \
   -F "file=@native-app/dist/connexa_5.2.8_amd64.deb"
 
 # Upload EXE installer
-curl -X POST https://license-connexify.co.za/api/admin/upload-installer \
+curl -X POST https://www.connexify.co.za/api/admin/upload-installer \
   -F "admin_token=YOUR_TOKEN" \
   -F "file=@native-app/dist/Connexa-Setup-5.2.8.exe"
 
 # Verify uploads
-curl "https://license-connexify.co.za/api/admin/list-files?admin_token=YOUR_TOKEN"
+curl "https://www.connexify.co.za/api/admin/list-files?admin_token=YOUR_TOKEN"
 ```
 
-Files are stored on Render's persistent disk (1GB). Download URLs:
-- `https://license-connexify.co.za/static/connexa_5.2.8_amd64.deb`
-- `https://license-connexify.co.za/static/Connexa-Setup-5.2.8.exe`
-
-### 4. Update the license server URL in the app
-
-In `electron/license.cjs`, change:
-```javascript
-this.serverUrl = process.env.LICENSE_SERVER_URL || 'https://connexify.co.za';
-```
+Files are stored in GCS bucket `connexify-license-data`. Download URLs:
+- `https://www.connexify.co.za/static/connexa_5.2.8_amd64.deb`
+- `https://www.connexify.co.za/static/Connexa-Setup-5.2.8.exe`
 
 ## Admin API Examples
 
 ```bash
 # Create a license
-curl -X POST https://connexify.co.za/api/admin/create-license \
+curl -X POST https://www.connexify.co.za/api/admin/create-license \
   -H "Content-Type: application/json" \
   -d '{"admin_token":"YOUR_TOKEN","duration_days":365,"customer_email":"client@example.com"}'
 
 # List all licenses
-curl "https://connexify.co.za/api/admin/list-licenses?admin_token=YOUR_TOKEN"
+curl "https://www.connexify.co.za/api/admin/list-licenses?admin_token=YOUR_TOKEN"
 
 # Delete a license
-curl -X POST https://connexify.co.za/api/admin/delete-license \
+curl -X POST https://www.connexify.co.za/api/admin/delete-license \
   -H "Content-Type: application/json" \
   -d '{"admin_token":"YOUR_TOKEN","license_key":"XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"}'
 ```
@@ -92,9 +96,30 @@ python main.py
 # Open http://localhost:8002
 ```
 
+## How Storage Works
+
+The `storage.py` module provides a transparent abstraction:
+
+- **When `GCS_BUCKET` is set** (Cloud Run): JSON data is stored in `gs://<bucket>/data/`. Installer files go to `gs://<bucket>/static/`. Local `/tmp` acts as a cache.
+- **When `GCS_BUCKET` is empty** (local dev): Uses local filesystem only. No GCS dependency needed.
+
+## Cost Estimate
+
+Cloud Run free tier (per month):
+- 2 million requests
+- 360,000 GB-seconds compute
+- 1 GB outbound data
+
+GCS free tier:
+- 5 GB storage
+- 5,000 Class A operations (writes)
+- 50,000 Class B operations (reads)
+
+**Expected cost: $0/month** for current usage levels.
+
 ## Important Notes
 
-- Render free tier spins down after 15 minutes of inactivity (first request after idle takes ~30s)
-- License data persists on Render's disk mount at `/opt/render/project/data/`
-- The disk is included in the `render.yaml` configuration (1GB)
-- SMTP: Use a Gmail App Password (Google Account → Security → App Passwords)
+- Cloud Run scales to zero when idle — first request after idle takes ~2-3s (cold start)
+- License data persists in GCS bucket `connexify-license-data`
+- SMTP: Uses `mail.connexify.co.za` on port 587 with STARTTLS
+- Custom domain mapped via `gcloud run domain-mappings`

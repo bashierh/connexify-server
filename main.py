@@ -1,6 +1,6 @@
 """
 Connexa License Server + Connexify Website
-Deployed on Render.com free tier
+Deployed on Google Cloud Run (GCP)
 """
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
@@ -44,13 +44,10 @@ app.add_middleware(
 )
 
 # ── Configuration ──
-# On Cloud Run containers use /tmp for local caching. On Render use the
-# persistent disk.  For local dev, fall back to the current directory.
-_RENDER_DATA = Path("/opt/render/project/data")
+# On Cloud Run containers use /tmp for local caching.
+# For local dev, fall back to the current directory.
 _CLOUD_RUN_TMP = Path("/tmp/connexify-data")
-if _RENDER_DATA.exists():
-    DATA_DIR = str(_RENDER_DATA)
-elif os.getenv("K_SERVICE"):      # Cloud Run sets K_SERVICE automatically
+if os.getenv("K_SERVICE"):        # Cloud Run sets K_SERVICE automatically
     _CLOUD_RUN_TMP.mkdir(parents=True, exist_ok=True)
     DATA_DIR = str(_CLOUD_RUN_TMP)
 else:
@@ -1348,7 +1345,7 @@ if os.path.exists(SMTP_SETTINGS_FILE):
     save_smtp_settings(_saved_smtp)
 else:
     # First-time: create smtp_settings.json with correct defaults
-    # This overrides any stale env vars (e.g. old render.yaml shipped smtp.gmail.com)
+    # This ensures correct defaults on first run
     save_smtp_settings({
         "host": "mail.connexify.co.za",
         "port": 587,
@@ -1541,7 +1538,7 @@ async def health_check():
 
 
 # Serve static files for downloads (DEB / EXE / logos)
-# Use persistent disk on Render, /tmp on Cloud Run, or ./static locally
+# Use /tmp on Cloud Run, or ./static locally
 STATIC_DIR = Path(os.path.join(DATA_DIR, "static"))
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 

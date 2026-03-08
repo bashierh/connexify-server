@@ -48,9 +48,9 @@ if ($bucketExists) {
     Write-Host "  Bucket created."
 }
 
-# ── Step 3: Data migration reminder ──────────────────────────────
-Write-Host "`n[3/6] Data migration check..." -ForegroundColor Yellow
-Write-Host "  If migrating from Render, upload existing data:"
+# ── Step 3: Verify GCS data ───────────────────────────────────
+Write-Host "`n[3/6] Data check..." -ForegroundColor Yellow
+Write-Host "  To upload existing data to GCS:"
 Write-Host "    gsutil cp license_database.json gs://$BucketName/data/license_database.json"
 Write-Host "    gsutil cp portal_users.json     gs://$BucketName/data/portal_users.json"
 

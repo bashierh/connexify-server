@@ -52,13 +52,13 @@ else
   echo "  Bucket created."
 fi
 
-# ── Step 3: Migrate existing data from Render to GCS ─────────────
+# ── Step 3: Verify GCS data ─────────────────────────────────
 echo ""
-echo "[3/6] Data migration check..."
-echo "  If you have existing data on Render, upload it with:"
+echo "[3/6] Data check..."
+echo "  To upload existing data to GCS:"
 echo "    gsutil cp license_database.json gs://${BUCKET_NAME}/data/license_database.json"
 echo "    gsutil cp portal_users.json     gs://${BUCKET_NAME}/data/portal_users.json"
-echo "  (skipping automatic migration – run manually if needed)"
+echo "  (skipping – run manually if needed)"
 
 # ── Step 4: Build container image ─────────────────────────────────
 echo ""
@@ -109,7 +109,7 @@ echo "  Admin:  ${SERVICE_URL}/admin"
 echo ""
 echo "  Next steps:"
 echo "  1. Verify health: curl ${SERVICE_URL}/api/health"
-echo "  2. Migrate data from Render (see Step 3 above)"
+echo "  2. Upload data to GCS if needed (see Step 3 above)"
 echo "  3. Map custom domain:  gcloud run domain-mappings create \\"
 echo "       --service ${SERVICE_NAME} --region ${REGION} --domain license.connexify.co.za"
 echo "  4. Update DNS: CNAME license.connexify.co.za → ghs.googlehosted.com"
