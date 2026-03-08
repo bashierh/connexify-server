@@ -339,19 +339,22 @@ ADMIN_HTML = """<!DOCTYPE html>
                                 <div id="pipe-twitter-dot" class="w-3 h-3 rounded-full bg-red-500 mx-auto mb-2"></div>
                                 <p class="text-sm text-white font-medium">Twitter / X</p>
                                 <p id="pipe-twitter-status" class="text-xs text-slate-400 mt-1">Not connected</p>
-                                <button onclick="showSetupGuide('twitter')" class="mt-2 text-[10px] text-blue-400 hover:text-blue-300 underline">Setup Guide</button>
+                                <button id="btn-connect-twitter" onclick="oauthConnect('twitter')" class="mt-2 bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-medium transition">Connect Twitter</button>
+                                <button onclick="showSetupGuide('twitter')" class="mt-1 text-[10px] text-slate-500 hover:text-slate-300 underline block mx-auto">Manual Setup</button>
                             </div>
                             <div class="bg-slate-800/50 rounded-lg p-4 text-center">
                                 <div id="pipe-linkedin-dot" class="w-3 h-3 rounded-full bg-red-500 mx-auto mb-2"></div>
                                 <p class="text-sm text-white font-medium">LinkedIn</p>
                                 <p id="pipe-linkedin-status" class="text-xs text-slate-400 mt-1">Not connected</p>
-                                <button onclick="showSetupGuide('linkedin')" class="mt-2 text-[10px] text-blue-400 hover:text-blue-300 underline">Setup Guide</button>
+                                <button id="btn-connect-linkedin" onclick="oauthConnect('linkedin')" class="mt-2 bg-blue-700 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-medium transition">Connect LinkedIn</button>
+                                <button onclick="showSetupGuide('linkedin')" class="mt-1 text-[10px] text-slate-500 hover:text-slate-300 underline block mx-auto">Manual Setup</button>
                             </div>
                             <div class="bg-slate-800/50 rounded-lg p-4 text-center">
                                 <div id="pipe-facebook-dot" class="w-3 h-3 rounded-full bg-red-500 mx-auto mb-2"></div>
                                 <p class="text-sm text-white font-medium">Facebook</p>
                                 <p id="pipe-facebook-status" class="text-xs text-slate-400 mt-1">Not connected</p>
-                                <button onclick="showSetupGuide('facebook')" class="mt-2 text-[10px] text-blue-400 hover:text-blue-300 underline">Setup Guide</button>
+                                <button id="btn-connect-facebook" onclick="oauthConnect('facebook')" class="mt-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-medium transition">Connect Facebook</button>
+                                <button onclick="showSetupGuide('facebook')" class="mt-1 text-[10px] text-slate-500 hover:text-slate-300 underline block mx-auto">Manual Setup</button>
                             </div>
                         </div>
                         <div class="flex items-center gap-4 text-xs text-slate-500 border-t border-slate-700/30 pt-3">
@@ -361,10 +364,47 @@ ADMIN_HTML = """<!DOCTYPE html>
                         </div>
                     </div>
 
+                    <!-- OAuth App Configuration -->
+                    <div class="glass rounded-xl p-6 mb-6 border border-slate-700/30">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 class="text-lg font-bold text-white">API App Credentials</h3>
+                                <p class="text-xs text-slate-400 mt-1">Configure your developer app credentials to enable one-click OAuth connection</p>
+                            </div>
+                            <button onclick="toggleOAuthConfig()" id="oauth-config-toggle" class="text-xs text-blue-400 hover:text-blue-300">&#9881; Configure Apps</button>
+                        </div>
+                        <div id="oauth-config-panel" class="hidden space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="bg-slate-800/60 rounded-lg p-4">
+                                    <p class="text-xs font-bold text-sky-400 mb-3">Twitter / X</p>
+                                    <input id="oauth-twitter-id" type="text" placeholder="Client ID" class="w-full px-3 py-2 rounded-lg text-xs mb-2">
+                                    <input id="oauth-twitter-secret" type="password" placeholder="Client Secret" class="w-full px-3 py-2 rounded-lg text-xs">
+                                    <p class="text-[10px] text-slate-500 mt-2">From <a href='https://developer.x.com/en/portal/dashboard' target='_blank' class='text-blue-400 underline'>developer.x.com</a> &rarr; OAuth 2.0 with PKCE</p>
+                                </div>
+                                <div class="bg-slate-800/60 rounded-lg p-4">
+                                    <p class="text-xs font-bold text-blue-400 mb-3">LinkedIn</p>
+                                    <input id="oauth-linkedin-id" type="text" placeholder="Client ID" class="w-full px-3 py-2 rounded-lg text-xs mb-2">
+                                    <input id="oauth-linkedin-secret" type="password" placeholder="Client Secret" class="w-full px-3 py-2 rounded-lg text-xs">
+                                    <p class="text-[10px] text-slate-500 mt-2">From <a href='https://www.linkedin.com/developers/apps' target='_blank' class='text-blue-400 underline'>linkedin.com/developers</a></p>
+                                </div>
+                                <div class="bg-slate-800/60 rounded-lg p-4">
+                                    <p class="text-xs font-bold text-blue-400 mb-3">Facebook</p>
+                                    <input id="oauth-facebook-id" type="text" placeholder="App ID" class="w-full px-3 py-2 rounded-lg text-xs mb-2">
+                                    <input id="oauth-facebook-secret" type="password" placeholder="App Secret" class="w-full px-3 py-2 rounded-lg text-xs">
+                                    <p class="text-[10px] text-slate-500 mt-2">From <a href='https://developers.facebook.com/apps/' target='_blank' class='text-blue-400 underline'>developers.facebook.com</a></p>
+                                </div>
+                            </div>
+                            <div class="flex gap-3">
+                                <button onclick="saveOAuthConfig()" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">Save API Credentials</button>
+                                <div id="oauth-config-status" class="flex items-center gap-2 text-xs text-slate-400"></div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Connected Accounts -->
                     <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
                         <h3 class="text-lg font-bold text-white">Connected Accounts</h3>
-                        <button onclick="showAccountModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">+ Add Account</button>
+                        <button onclick="showAccountModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition">+ Add Manually</button>
                     </div>
                     <div id="accounts-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                 </div>
@@ -1195,7 +1235,7 @@ ADMIN_HTML = """<!DOCTYPE html>
             btn.className = btn.className.replace('text-slate-400 bg-slate-800/30 border-slate-700/30', 'text-white bg-blue-600/30 border-blue-500/30');
             btn.classList.add('active');
             if (sub === 'calendar') renderCalendar();
-            if (sub === 'accounts') { loadSocialAccounts(); loadPublishStatus(); }
+            if (sub === 'accounts') { loadSocialAccounts(); loadPublishStatus(); loadOAuthConfig(); }
             if (sub === 'automation') loadAutomationConfig();
         }
 
@@ -1516,6 +1556,7 @@ ADMIN_HTML = """<!DOCTYPE html>
                 const d = await r.json();
                 socialAccounts = d.accounts || [];
                 renderAccounts();
+                updateConnectButtons();
             } catch(e) { console.error('Load accounts error:', e); }
         }
 
@@ -1556,6 +1597,103 @@ ADMIN_HTML = """<!DOCTYPE html>
                     </div>
                 </div>`;
             }).join('');
+        }
+
+        // ═══════════════════════════════════════════════
+        //   OAUTH CONNECT FLOWS
+        // ═══════════════════════════════════════════════
+
+        let oauthConfig = {};
+
+        async function loadOAuthConfig() {
+            try {
+                const r = await fetch(`${BASE}/api/admin/social/oauth/config?admin_token=${encodeURIComponent(TOKEN)}`);
+                const d = await r.json();
+                oauthConfig = d;
+                updateConnectButtons();
+            } catch(e) { console.error('OAuth config load error:', e); }
+        }
+
+        function updateConnectButtons() {
+            ['twitter', 'linkedin', 'facebook'].forEach(p => {
+                const btn = document.getElementById(`btn-connect-${p}`);
+                if (!btn) return;
+                const cfg = oauthConfig[p];
+                const connected = socialAccounts.some(a => a.platform === p && a.enabled !== false);
+                if (connected) {
+                    btn.textContent = `\\u2713 ${p.charAt(0).toUpperCase()+p.slice(1)} Connected`;
+                    btn.className = btn.className.replace(/bg-\\w+-\\d+/g, '').trim() + ' bg-green-700 cursor-default';
+                    btn.onclick = null;
+                } else if (cfg && cfg.configured) {
+                    btn.textContent = `Connect ${p.charAt(0).toUpperCase()+p.slice(1)}`;
+                    btn.onclick = () => oauthConnect(p);
+                    btn.style.opacity = '1';
+                } else {
+                    btn.textContent = `Configure ${p.charAt(0).toUpperCase()+p.slice(1)} App`;
+                    btn.onclick = () => { toggleOAuthConfig(true); };
+                    btn.style.opacity = '0.7';
+                }
+            });
+        }
+
+        function oauthConnect(platform) {
+            const cfg = oauthConfig[platform];
+            if (!cfg || !cfg.configured) {
+                showToast('Configure API credentials first');
+                toggleOAuthConfig(true);
+                return;
+            }
+            // Open OAuth flow in popup window
+            const url = `${BASE}/api/admin/social/oauth/${platform}/start?admin_token=${encodeURIComponent(TOKEN)}`;
+            const popup = window.open(url, `oauth_${platform}`, 'width=600,height=700,scrollbars=yes');
+            // Poll for popup close and refresh accounts
+            const check = setInterval(() => {
+                if (popup && popup.closed) {
+                    clearInterval(check);
+                    loadSocialAccounts();
+                    loadPublishStatus();
+                    loadOAuthConfig();
+                    showToast(`${platform.charAt(0).toUpperCase()+platform.slice(1)} connection updated`);
+                }
+            }, 1000);
+        }
+
+        function toggleOAuthConfig(forceOpen) {
+            const panel = document.getElementById('oauth-config-panel');
+            if (forceOpen || panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                document.getElementById('oauth-config-toggle').textContent = '\\u25B2 Hide';
+            } else {
+                panel.classList.add('hidden');
+                document.getElementById('oauth-config-toggle').textContent = '\\u2699 Configure Apps';
+            }
+        }
+
+        async function saveOAuthConfig() {
+            const body = {
+                admin_token: TOKEN,
+                twitter_client_id: document.getElementById('oauth-twitter-id').value.trim(),
+                twitter_client_secret: document.getElementById('oauth-twitter-secret').value.trim(),
+                linkedin_client_id: document.getElementById('oauth-linkedin-id').value.trim(),
+                linkedin_client_secret: document.getElementById('oauth-linkedin-secret').value.trim(),
+                facebook_app_id: document.getElementById('oauth-facebook-id').value.trim(),
+                facebook_app_secret: document.getElementById('oauth-facebook-secret').value.trim(),
+            };
+            // Remove empty values so we don't overwrite existing config
+            Object.keys(body).forEach(k => { if (k !== 'admin_token' && !body[k]) delete body[k]; });
+            try {
+                const r = await fetch(`${BASE}/api/admin/social/oauth/config`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+                });
+                const d = await r.json();
+                if (d.success) {
+                    showToast(`Saved ${d.updated.length} credential(s)`);
+                    loadOAuthConfig();
+                    document.getElementById('oauth-config-status').innerHTML = '<span class=\"text-green-400\">\\u2713 Saved</span>';
+                } else {
+                    showToast('Error saving config');
+                }
+            } catch(e) { showToast('Network error saving config'); }
         }
 
         function showAccountModal(acc) {

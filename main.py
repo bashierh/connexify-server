@@ -16,6 +16,7 @@ import urllib.parse
 import asyncio
 import random
 import logging
+import base64
 from pathlib import Path
 from typing import Optional
 
@@ -1885,6 +1886,37 @@ async def edit_license(request: EditLicenseRequest):
 #   SOCIAL MEDIA MANAGEMENT
 # ══════════════════════════════════════════════════════════════════
 
+# ── Social OAuth App Credentials (set via env vars or /api/admin/social/oauth/config) ──
+SOCIAL_OAUTH_FILE = os.path.join(DATA_DIR, "social_oauth_config.json")
+
+def _load_social_oauth_config():
+    if os.path.exists(SOCIAL_OAUTH_FILE):
+        try:
+            with open(SOCIAL_OAUTH_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def _save_social_oauth_config(cfg):
+    with open(SOCIAL_OAUTH_FILE, 'w') as f:
+        json.dump(cfg, f, indent=2)
+
+_social_oauth_cfg = _load_social_oauth_config()
+
+# Twitter/X OAuth 2.0 (User Auth with PKCE — free tier)
+TWITTER_CLIENT_ID = os.getenv("TWITTER_CLIENT_ID", _social_oauth_cfg.get("twitter_client_id", ""))
+TWITTER_CLIENT_SECRET = os.getenv("TWITTER_CLIENT_SECRET", _social_oauth_cfg.get("twitter_client_secret", ""))
+# LinkedIn OAuth 2.0
+LINKEDIN_CLIENT_ID = os.getenv("LINKEDIN_CLIENT_ID", _social_oauth_cfg.get("linkedin_client_id", ""))
+LINKEDIN_CLIENT_SECRET = os.getenv("LINKEDIN_CLIENT_SECRET", _social_oauth_cfg.get("linkedin_client_secret", ""))
+# Facebook OAuth 2.0
+FACEBOOK_APP_ID = os.getenv("FACEBOOK_APP_ID", _social_oauth_cfg.get("facebook_app_id", ""))
+FACEBOOK_APP_SECRET = os.getenv("FACEBOOK_APP_SECRET", _social_oauth_cfg.get("facebook_app_secret", ""))
+
+# In-memory OAuth state store {state_token: {platform, created, code_verifier, ...}}
+_OAUTH_STATES: dict = {}
+
 SOCIAL_POSTS_FILE = os.path.join(DATA_DIR, "social_posts.json")
 SOCIAL_ACCOUNTS_FILE = os.path.join(DATA_DIR, "social_accounts.json")
 SOCIAL_POSTS: list = []
@@ -2151,6 +2183,373 @@ async def delete_social_account(request: Request):
     SOCIAL_ACCOUNTS = [a for a in SOCIAL_ACCOUNTS if a["id"] != acc_id]
     save_social_accounts()
     return {"success": True}
+
+
+# ═══════════════════════════════════════════════════════
+#   SOCIAL MEDIA OAUTH 2.0 FLOWS
+#   Automated "Connect with..." for Twitter, LinkedIn, Facebook
+# ═══════════════════════════════════════════════════════
+
+@app.get("/api/admin/social/oauth/config")
+async def get_oauth_config(admin_token: str = "", token: str = ""):
+    """Return which OAuth apps are configured (no secrets exposed)."""
+    tok = admin_token or token
+    if tok != ADMIN_TOKEN:
+        raise HTTPException(403, "Unauthorized")
+    return {
+        "twitter": {"configured": bool(TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET), "client_id": TWITTER_CLIENT_ID[:8] + "..." if TWITTER_CLIENT_ID else ""},
+        "linkedin": {"configured": bool(LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET), "client_id": LINKEDIN_CLIENT_ID[:8] + "..." if LINKEDIN_CLIENT_ID else ""},
+        "facebook": {"configured": bool(FACEBOOK_APP_ID and FACEBOOK_APP_SECRET), "client_id": FACEBOOK_APP_ID[:8] + "..." if FACEBOOK_APP_ID else ""},
+    }
+
+
+@app.post("/api/admin/social/oauth/config")
+async def save_oauth_config_endpoint(request: Request):
+    """Save OAuth app credentials (Client IDs and Secrets)."""
+    global TWITTER_CLIENT_ID, TWITTER_CLIENT_SECRET, LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, FACEBOOK_APP_ID, FACEBOOK_APP_SECRET
+    body = await request.json()
+    if body.get("admin_token") != ADMIN_TOKEN:
+        raise HTTPException(403, "Unauthorized")
+
+    cfg = _load_social_oauth_config()
+    updated = []
+    for key in ("twitter_client_id", "twitter_client_secret", "linkedin_client_id", "linkedin_client_secret", "facebook_app_id", "facebook_app_secret"):
+        if key in body and body[key]:
+            cfg[key] = body[key]
+            updated.append(key)
+    _save_social_oauth_config(cfg)
+
+    # Update runtime globals
+    TWITTER_CLIENT_ID = cfg.get("twitter_client_id", TWITTER_CLIENT_ID)
+    TWITTER_CLIENT_SECRET = cfg.get("twitter_client_secret", TWITTER_CLIENT_SECRET)
+    LINKEDIN_CLIENT_ID = cfg.get("linkedin_client_id", LINKEDIN_CLIENT_ID)
+    LINKEDIN_CLIENT_SECRET = cfg.get("linkedin_client_secret", LINKEDIN_CLIENT_SECRET)
+    FACEBOOK_APP_ID = cfg.get("facebook_app_id", FACEBOOK_APP_ID)
+    FACEBOOK_APP_SECRET = cfg.get("facebook_app_secret", FACEBOOK_APP_SECRET)
+
+    return {"success": True, "updated": updated}
+
+
+def _cleanup_old_oauth_states():
+    """Remove OAuth states older than 10 minutes."""
+    now = datetime.now()
+    expired = [k for k, v in _OAUTH_STATES.items() if (now - datetime.fromisoformat(v["created"])).seconds > 600]
+    for k in expired:
+        del _OAUTH_STATES[k]
+
+
+@app.get("/api/admin/social/oauth/twitter/start")
+async def oauth_twitter_start(admin_token: str = "", token: str = ""):
+    """Start Twitter OAuth 2.0 PKCE flow — redirects user to Twitter."""
+    tok = admin_token or token
+    if tok != ADMIN_TOKEN:
+        raise HTTPException(403, "Unauthorized")
+    if not TWITTER_CLIENT_ID or not TWITTER_CLIENT_SECRET:
+        raise HTTPException(400, "Twitter OAuth app not configured. Set Client ID and Secret first.")
+
+    _cleanup_old_oauth_states()
+    state = secrets.token_urlsafe(32)
+    code_verifier = secrets.token_urlsafe(64)
+    # S256 code challenge
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode()).digest()
+    ).decode().rstrip("=")
+
+    _OAUTH_STATES[state] = {
+        "platform": "twitter",
+        "created": datetime.now().isoformat(),
+        "code_verifier": code_verifier,
+        "admin_token": tok,
+    }
+
+    redirect_uri = f"{SITE_URL}/api/admin/social/oauth/twitter/callback"
+    params = urllib.parse.urlencode({
+        "response_type": "code",
+        "client_id": TWITTER_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "scope": "tweet.read tweet.write users.read offline.access",
+        "state": state,
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256",
+    })
+    return RedirectResponse(f"https://twitter.com/i/oauth2/authorize?{params}")
+
+
+@app.get("/api/admin/social/oauth/twitter/callback")
+async def oauth_twitter_callback(code: str = "", state: str = "", error: str = ""):
+    """Twitter OAuth 2.0 callback — exchanges code for tokens."""
+    import httpx
+
+    if error:
+        return _oauth_result_page("Twitter", False, f"Authorization denied: {error}")
+
+    oauth_state = _OAUTH_STATES.pop(state, None)
+    if not oauth_state or oauth_state["platform"] != "twitter":
+        return _oauth_result_page("Twitter", False, "Invalid or expired state. Please try again.")
+
+    redirect_uri = f"{SITE_URL}/api/admin/social/oauth/twitter/callback"
+    code_verifier = oauth_state["code_verifier"]
+
+    try:
+        # Exchange authorization code for access token
+        auth_str = base64.b64encode(f"{TWITTER_CLIENT_ID}:{TWITTER_CLIENT_SECRET}".encode()).decode()
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post("https://api.twitter.com/2/oauth2/token", data={
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": redirect_uri,
+                "code_verifier": code_verifier,
+            }, headers={
+                "Authorization": f"Basic {auth_str}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            })
+
+        if resp.status_code != 200:
+            return _oauth_result_page("Twitter", False, f"Token exchange failed: {resp.text[:200]}")
+
+        tokens = resp.json()
+        access_token = tokens.get("access_token", "")
+        refresh_token = tokens.get("refresh_token", "")
+
+        # Get user info
+        async with httpx.AsyncClient(timeout=15) as client:
+            user_resp = await client.get("https://api.twitter.com/2/users/me", headers={
+                "Authorization": f"Bearer {access_token}",
+            })
+        username = ""
+        if user_resp.status_code == 200:
+            user_data = user_resp.json().get("data", {})
+            username = user_data.get("username", "")
+
+        # Save as social account
+        _save_oauth_account("twitter", f"@{username}" if username else "Twitter Account", {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "api_key": TWITTER_CLIENT_ID,
+            "api_secret": TWITTER_CLIENT_SECRET,
+            "access_token_secret": "",
+            "oauth_type": "oauth2_pkce",
+        })
+
+        return _oauth_result_page("Twitter", True, f"Connected as @{username}!" if username else "Connected successfully!")
+
+    except Exception as e:
+        return _oauth_result_page("Twitter", False, f"Error: {str(e)[:200]}")
+
+
+@app.get("/api/admin/social/oauth/linkedin/start")
+async def oauth_linkedin_start(admin_token: str = "", token: str = ""):
+    """Start LinkedIn OAuth 2.0 flow."""
+    tok = admin_token or token
+    if tok != ADMIN_TOKEN:
+        raise HTTPException(403, "Unauthorized")
+    if not LINKEDIN_CLIENT_ID or not LINKEDIN_CLIENT_SECRET:
+        raise HTTPException(400, "LinkedIn OAuth app not configured. Set Client ID and Secret first.")
+
+    _cleanup_old_oauth_states()
+    state = secrets.token_urlsafe(32)
+    _OAUTH_STATES[state] = {"platform": "linkedin", "created": datetime.now().isoformat(), "admin_token": tok}
+
+    redirect_uri = f"{SITE_URL}/api/admin/social/oauth/linkedin/callback"
+    params = urllib.parse.urlencode({
+        "response_type": "code",
+        "client_id": LINKEDIN_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "scope": "openid profile w_member_social",
+        "state": state,
+    })
+    return RedirectResponse(f"https://www.linkedin.com/oauth/v2/authorization?{params}")
+
+
+@app.get("/api/admin/social/oauth/linkedin/callback")
+async def oauth_linkedin_callback(code: str = "", state: str = "", error: str = ""):
+    """LinkedIn OAuth 2.0 callback."""
+    import httpx
+
+    if error:
+        return _oauth_result_page("LinkedIn", False, f"Authorization denied: {error}")
+
+    oauth_state = _OAUTH_STATES.pop(state, None)
+    if not oauth_state or oauth_state["platform"] != "linkedin":
+        return _oauth_result_page("LinkedIn", False, "Invalid or expired state. Please try again.")
+
+    redirect_uri = f"{SITE_URL}/api/admin/social/oauth/linkedin/callback"
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post("https://www.linkedin.com/oauth/v2/accessToken", data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": redirect_uri,
+                "client_id": LINKEDIN_CLIENT_ID,
+                "client_secret": LINKEDIN_CLIENT_SECRET,
+            }, headers={"Content-Type": "application/x-www-form-urlencoded"})
+
+        if resp.status_code != 200:
+            return _oauth_result_page("LinkedIn", False, f"Token exchange failed: {resp.text[:200]}")
+
+        tokens = resp.json()
+        access_token = tokens.get("access_token", "")
+
+        # Get user profile
+        async with httpx.AsyncClient(timeout=15) as client:
+            prof = await client.get("https://api.linkedin.com/v2/userinfo", headers={
+                "Authorization": f"Bearer {access_token}",
+            })
+        name = ""
+        person_urn = ""
+        if prof.status_code == 200:
+            data = prof.json()
+            name = data.get("name", "")
+            sub = data.get("sub", "")
+            person_urn = f"urn:li:person:{sub}" if sub else ""
+
+        _save_oauth_account("linkedin", name or "LinkedIn Account", {
+            "access_token": access_token,
+            "page_id": person_urn,
+            "oauth_type": "oauth2",
+        })
+
+        return _oauth_result_page("LinkedIn", True, f"Connected as {name}!" if name else "Connected successfully!")
+
+    except Exception as e:
+        return _oauth_result_page("LinkedIn", False, f"Error: {str(e)[:200]}")
+
+
+@app.get("/api/admin/social/oauth/facebook/start")
+async def oauth_facebook_start(admin_token: str = "", token: str = ""):
+    """Start Facebook OAuth 2.0 flow."""
+    tok = admin_token or token
+    if tok != ADMIN_TOKEN:
+        raise HTTPException(403, "Unauthorized")
+    if not FACEBOOK_APP_ID or not FACEBOOK_APP_SECRET:
+        raise HTTPException(400, "Facebook OAuth app not configured. Set App ID and Secret first.")
+
+    _cleanup_old_oauth_states()
+    state = secrets.token_urlsafe(32)
+    _OAUTH_STATES[state] = {"platform": "facebook", "created": datetime.now().isoformat(), "admin_token": tok}
+
+    redirect_uri = f"{SITE_URL}/api/admin/social/oauth/facebook/callback"
+    params = urllib.parse.urlencode({
+        "client_id": FACEBOOK_APP_ID,
+        "redirect_uri": redirect_uri,
+        "scope": "pages_manage_posts,pages_read_engagement",
+        "state": state,
+        "response_type": "code",
+    })
+    return RedirectResponse(f"https://www.facebook.com/v19.0/dialog/oauth?{params}")
+
+
+@app.get("/api/admin/social/oauth/facebook/callback")
+async def oauth_facebook_callback(code: str = "", state: str = "", error: str = ""):
+    """Facebook OAuth 2.0 callback — gets user token, then exchanges for long-lived page token."""
+    import httpx
+
+    if error:
+        return _oauth_result_page("Facebook", False, f"Authorization denied: {error}")
+
+    oauth_state = _OAUTH_STATES.pop(state, None)
+    if not oauth_state or oauth_state["platform"] != "facebook":
+        return _oauth_result_page("Facebook", False, "Invalid or expired state. Please try again.")
+
+    redirect_uri = f"{SITE_URL}/api/admin/social/oauth/facebook/callback"
+
+    try:
+        # Exchange code for short-lived user token
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get("https://graph.facebook.com/v19.0/oauth/access_token", params={
+                "client_id": FACEBOOK_APP_ID,
+                "redirect_uri": redirect_uri,
+                "client_secret": FACEBOOK_APP_SECRET,
+                "code": code,
+            })
+
+        if resp.status_code != 200:
+            return _oauth_result_page("Facebook", False, f"Token exchange failed: {resp.text[:200]}")
+
+        user_token = resp.json().get("access_token", "")
+
+        # Exchange for long-lived token (60 days)
+        async with httpx.AsyncClient(timeout=15) as client:
+            ll_resp = await client.get("https://graph.facebook.com/v19.0/oauth/access_token", params={
+                "grant_type": "fb_exchange_token",
+                "client_id": FACEBOOK_APP_ID,
+                "client_secret": FACEBOOK_APP_SECRET,
+                "fb_exchange_token": user_token,
+            })
+        long_lived_token = ll_resp.json().get("access_token", user_token) if ll_resp.status_code == 200 else user_token
+
+        # Get user's pages and use the first page's never-expiring token
+        async with httpx.AsyncClient(timeout=15) as client:
+            pages_resp = await client.get("https://graph.facebook.com/v19.0/me/accounts", params={
+                "access_token": long_lived_token,
+            })
+
+        page_name = "Facebook Account"
+        page_token = long_lived_token
+        page_id = "me"
+
+        if pages_resp.status_code == 200:
+            pages = pages_resp.json().get("data", [])
+            if pages:
+                page = pages[0]  # Use first page
+                page_token = page.get("access_token", long_lived_token)
+                page_id = page.get("id", "me")
+                page_name = page.get("name", "Facebook Page")
+
+        _save_oauth_account("facebook", page_name, {
+            "access_token": page_token,
+            "page_id": page_id,
+            "oauth_type": "oauth2",
+        })
+
+        return _oauth_result_page("Facebook", True, f"Connected page: {page_name}!")
+
+    except Exception as e:
+        return _oauth_result_page("Facebook", False, f"Error: {str(e)[:200]}")
+
+
+def _save_oauth_account(platform: str, account_name: str, creds: dict):
+    """Create or update a social account from OAuth flow."""
+    # Check if account for this platform already exists
+    existing = next((a for a in SOCIAL_ACCOUNTS if a.get("platform") == platform), None)
+    if existing:
+        existing["account_name"] = account_name
+        existing.update(creds)
+        existing["enabled"] = True
+        existing["updated_at"] = datetime.now().isoformat()
+    else:
+        SOCIAL_ACCOUNTS.append({
+            "id": secrets.token_hex(8),
+            "platform": platform,
+            "account_name": account_name,
+            **creds,
+            "enabled": True,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+        })
+    save_social_accounts()
+    print(f"[OAuth] Saved {platform} account: {account_name}")
+
+
+def _oauth_result_page(platform: str, success: bool, message: str) -> HTMLResponse:
+    """Return an HTML page showing OAuth result and auto-closing back to admin."""
+    color = "#22c55e" if success else "#ef4444"
+    icon = "&#10003;" if success else "&#10007;"
+    return HTMLResponse(f"""<!DOCTYPE html><html><head>
+<meta charset="UTF-8"><title>{platform} Connection</title>
+<style>body{{background:#0a0a0f;color:#e2e8f0;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}}
+.card{{background:#1e293b;border:1px solid {color}40;border-radius:16px;padding:48px;text-align:center;max-width:400px}}
+.icon{{font-size:48px;color:{color};margin-bottom:16px}}.msg{{color:#94a3b8;font-size:14px;margin:12px 0 24px}}
+a{{display:inline-block;background:#3b82f6;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-size:14px}}</style>
+</head><body><div class="card">
+<div class="icon">{icon}</div>
+<h2>{platform} {'Connected' if success else 'Failed'}</h2>
+<p class="msg">{message}</p>
+<a href="/admin">Back to Admin Dashboard</a>
+</div>
+<script>setTimeout(()=>window.opener&&window.close(),3000)</script>
+</body></html>""")
 
 
 # ── Social Stats ──
@@ -3179,9 +3578,10 @@ async def get_setup_guide(admin_token: str = "", token: str = ""):
                     "1. Create a Twitter/X account at x.com/i/flow/signup",
                     "2. Go to developer.x.com and sign up for a Developer account (Free tier)",
                     "3. Create a Project and App in the Developer Portal",
-                    "4. In your App settings, set up 'User authentication settings' — enable OAuth 1.0a with Read+Write",
-                    "5. Generate your API Key, API Secret, Access Token, and Access Token Secret",
-                    "6. Enter all 4 credentials in the Add Account form below",
+                    "4. Under 'User authentication settings', enable OAuth 2.0 with PKCE — set Type: Web App",
+                    f"5. Set Callback URL to: {SITE_URL}/api/admin/social/oauth/twitter/callback",
+                    "6. Copy the Client ID and Client Secret — paste them in the 'API App Credentials' section",
+                    "7. Click 'Connect Twitter' — the OAuth flow will handle the rest automatically",
                 ],
                 "fields": ["api_key", "api_secret", "access_token", "access_token_secret"],
                 "free_tier": "1,500 tweets/month (Free), 3,000 tweets/month (Basic $200/mo)",
@@ -3194,9 +3594,10 @@ async def get_setup_guide(admin_token: str = "", token: str = ""):
                     "1. Create a LinkedIn account at linkedin.com/signup",
                     "2. Create a LinkedIn Company Page for Connexify",
                     "3. Go to linkedin.com/developers/apps and create a new app",
-                    "4. Request 'Share on LinkedIn' and 'Sign In with LinkedIn' products",
-                    "5. Generate an Access Token (valid 60 days — auto-refresh will be added)",
-                    "6. Enter the Access Token and your company page URN (urn:li:organization:XXXXX) below",
+                    "4. Under 'Auth' tab, add 'Share on LinkedIn' and 'Sign In with LinkedIn using OpenID Connect' products",
+                    f"5. Add Redirect URL: {SITE_URL}/api/admin/social/oauth/linkedin/callback",
+                    "6. Copy the Client ID and Client Secret — paste them in the 'API App Credentials' section",
+                    "7. Click 'Connect LinkedIn' — the OAuth flow will handle the rest automatically",
                 ],
                 "fields": ["access_token", "page_id"],
                 "free_tier": "Unlimited posts (standard API — rate limited to 100 calls/day)",
@@ -3209,9 +3610,10 @@ async def get_setup_guide(admin_token: str = "", token: str = ""):
                     "1. Create a Facebook account at facebook.com",
                     "2. Create a Facebook Page for Connexify",
                     "3. Go to developers.facebook.com and create a new app (Business type)",
-                    "4. Add 'Pages API' product to your app",
-                    "5. Generate a Page Access Token with 'pages_manage_posts' permission",
-                    "6. Enter the Page Access Token and Page ID below",
+                    "4. Add 'Facebook Login for Business' product — set to Web",
+                    f"5. Add OAuth Redirect URI: {SITE_URL}/api/admin/social/oauth/facebook/callback",
+                    "6. Under Settings > Basic, copy the App ID and App Secret",
+                    "7. Paste them in the 'API App Credentials' section and click 'Connect Facebook'",
                 ],
                 "fields": ["access_token", "page_id"],
                 "free_tier": "Unlimited posts with Page Access Token",
