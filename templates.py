@@ -34,6 +34,8 @@ body{background:#030712;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif}
 .step-dot.active{background:linear-gradient(135deg,#3b82f6,#06b6d4);color:#fff}
 .step-dot.done{background:#059669;color:#fff}
 .step-dot.pending{background:#1e293b;color:#64748b;border:2px solid #334155}
+.hero-s{pointer-events:none}.hero-s.active{pointer-events:auto}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .doc-link{display:block;padding:.5rem 1rem;border-radius:.5rem;font-size:.875rem;color:#94a3b8;transition:all .2s}
 .doc-link:hover,.doc-link.active{background:rgba(59,130,246,0.1);color:#3b82f6}
 </style>"""
@@ -176,22 +178,183 @@ Monitor your towers, manage devices, automate configurations, and track wireless
 </div>
 <div class="hidden lg:flex justify-center">
 <div class="float-anim relative">
-<div class="w-[420px] h-72 rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 shadow-2xl p-6 space-y-4">
-<div class="flex items-center gap-2">
+<div id="hero-slideshow" class="w-[420px] rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 shadow-2xl overflow-hidden" style="height:320px">
+<!-- Window chrome -->
+<div class="flex items-center gap-2 px-5 pt-4 pb-2">
 <div class="w-3 h-3 rounded-full bg-red-500"></div>
 <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
 <div class="w-3 h-3 rounded-full bg-green-500"></div>
-<span class="text-xs text-gray-500 ml-2">Connexa Dashboard</span>
+<span id="hero-slide-title" class="text-xs text-gray-500 ml-2">Dashboard</span>
 </div>
-<div class="grid grid-cols-3 gap-3">
-<div class="bg-gray-800/80 rounded-lg p-3 text-center"><div class="text-2xl font-bold text-blue-400">24</div><div class="text-[10px] text-gray-500">Towers</div></div>
-<div class="bg-gray-800/80 rounded-lg p-3 text-center"><div class="text-2xl font-bold text-green-400">847</div><div class="text-[10px] text-gray-500">Clients</div></div>
-<div class="bg-gray-800/80 rounded-lg p-3 text-center"><div class="text-2xl font-bold text-cyan-400">99.8%</div><div class="text-[10px] text-gray-500">Uptime</div></div>
+<!-- Slides -->
+<div class="relative" style="height:250px">
+
+<!-- Slide 1: Dashboard -->
+<div class="hero-s active absolute inset-0 px-5 pb-3 transition-opacity duration-500" data-title="Dashboard">
+<div class="grid grid-cols-3 gap-2 mb-3">
+<div class="bg-gray-800/80 rounded-lg p-2 text-center"><div class="text-xl font-bold text-blue-400">86</div><div class="text-[9px] text-gray-500">Towers</div></div>
+<div class="bg-gray-800/80 rounded-lg p-2 text-center"><div class="text-xl font-bold text-green-400">1,247</div><div class="text-[9px] text-gray-500">Devices</div></div>
+<div class="bg-gray-800/80 rounded-lg p-2 text-center"><div class="text-xl font-bold text-cyan-400">99.9%</div><div class="text-[9px] text-gray-500">Uptime</div></div>
 </div>
+<div class="grid grid-cols-2 gap-2 mb-2">
+<div class="bg-gray-800/80 rounded-lg p-2 text-center"><div class="text-lg font-bold text-purple-400">3,482</div><div class="text-[9px] text-gray-500">Users</div></div>
+<div class="bg-gray-800/80 rounded-lg p-2 text-center"><div class="text-lg font-bold text-amber-400">12,930</div><div class="text-[9px] text-gray-500">Audit Logs</div></div>
+</div>
+<div class="text-[9px] text-gray-500 uppercase tracking-wider mb-1 mt-2">Active Problems</div>
+<div class="space-y-1.5">
+<div class="flex items-center gap-2 bg-red-500/5 rounded px-2 py-1"><div class="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0"></div><span class="text-[10px] text-gray-400 truncate">BTS-Hilltop-01 &mdash; Device offline</span><span class="text-[9px] text-red-400 ml-auto flex-shrink-0">12m</span></div>
+<div class="flex items-center gap-2 bg-amber-500/5 rounded px-2 py-1"><div class="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0"></div><span class="text-[10px] text-gray-400 truncate">BTS-Central-03 &mdash; High CPU (91%)</span><span class="text-[9px] text-amber-400 ml-auto flex-shrink-0">2h</span></div>
+<div class="flex items-center gap-2 bg-amber-500/5 rounded px-2 py-1"><div class="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0"></div><span class="text-[10px] text-gray-400 truncate">CPE-Farm-219 &mdash; Weak signal -84 dBm</span><span class="text-[9px] text-amber-400 ml-auto flex-shrink-0">6h</span></div>
+</div>
+</div>
+
+<!-- Slide 2: Devices -->
+<div class="hero-s absolute inset-0 px-5 pb-3 opacity-0 transition-opacity duration-500" data-title="Devices &mdash; 1,247 managed">
+<div class="flex gap-1.5 mb-2">
+<span class="text-[9px] bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full font-medium">All 1,247</span>
+<span class="text-[9px] bg-green-500/15 text-green-400 px-2 py-0.5 rounded-full font-medium">&#9679; Online 1,209</span>
+<span class="text-[9px] bg-red-500/15 text-red-400 px-2 py-0.5 rounded-full font-medium">&#9679; Offline 38</span>
+</div>
+<div class="bg-gray-800/50 rounded-lg overflow-hidden text-[10px]">
+<div class="grid grid-cols-[20px_1fr_90px_55px_50px_52px] gap-1 px-2 py-1.5 text-gray-500 font-semibold border-b border-gray-700/50 uppercase text-[8px] tracking-wider">
+<span></span><span>Name</span><span>IP</span><span>Type</span><span>Status</span><span>Vendor</span>
+</div>
+<div class="grid grid-cols-[20px_1fr_90px_55px_50px_52px] gap-1 px-2 py-1 items-center border-b border-gray-800/50">
+<span class="w-3 h-3 rounded bg-cyan-500/20 text-cyan-400 text-[7px] font-bold text-center leading-3">M</span><span class="text-gray-300 font-medium truncate">BTS-Central-01</span><span class="text-gray-500 font-mono">10.44.10.1</span><span class="text-[8px] text-blue-400 bg-blue-500/10 rounded-full px-1.5 text-center">Tower</span><span class="text-[8px] text-green-400">&#9679; On</span><span class="text-gray-500">MikroTik</span>
+</div>
+<div class="grid grid-cols-[20px_1fr_90px_55px_50px_52px] gap-1 px-2 py-1 items-center border-b border-gray-800/50">
+<span class="w-3 h-3 rounded bg-cyan-500/20 text-cyan-400 text-[7px] font-bold text-center leading-3">M</span><span class="text-gray-300 font-medium truncate">BTS-Hilltop-01</span><span class="text-gray-500 font-mono">10.44.12.1</span><span class="text-[8px] text-blue-400 bg-blue-500/10 rounded-full px-1.5 text-center">Tower</span><span class="text-[8px] text-red-400">&#9679; Off</span><span class="text-gray-500">MikroTik</span>
+</div>
+<div class="grid grid-cols-[20px_1fr_90px_55px_50px_52px] gap-1 px-2 py-1 items-center border-b border-gray-800/50">
+<span class="w-3 h-3 rounded bg-blue-500/20 text-blue-400 text-[7px] font-bold text-center leading-3">U</span><span class="text-gray-300 font-medium truncate">AP-Riverside-14</span><span class="text-gray-500 font-mono">10.44.18.22</span><span class="text-[8px] text-blue-400 bg-blue-500/10 rounded-full px-1.5 text-center">Tower</span><span class="text-[8px] text-red-400">&#9679; Off</span><span class="text-gray-500">Ubiquiti</span>
+</div>
+<div class="grid grid-cols-[20px_1fr_90px_55px_50px_52px] gap-1 px-2 py-1 items-center border-b border-gray-800/50">
+<span class="w-3 h-3 rounded bg-green-500/20 text-green-400 text-[7px] font-bold text-center leading-3">C</span><span class="text-gray-300 font-medium truncate">PTP-Bridge-East</span><span class="text-gray-500 font-mono">10.44.20.5</span><span class="text-[8px] text-blue-400 bg-blue-500/10 rounded-full px-1.5 text-center">Tower</span><span class="text-[8px] text-green-400">&#9679; On</span><span class="text-gray-500">Cambium</span>
+</div>
+<div class="grid grid-cols-[20px_1fr_90px_55px_50px_52px] gap-1 px-2 py-1 items-center border-b border-gray-800/50">
+<span class="w-3 h-3 rounded bg-cyan-500/20 text-cyan-400 text-[7px] font-bold text-center leading-3">M</span><span class="text-gray-300 font-medium truncate">CPE-Farm-219</span><span class="text-gray-500 font-mono">10.44.32.19</span><span class="text-[8px] text-green-400 bg-green-500/10 rounded-full px-1.5 text-center">Client</span><span class="text-[8px] text-green-400">&#9679; On</span><span class="text-gray-500">MikroTik</span>
+</div>
+<div class="grid grid-cols-[20px_1fr_90px_55px_50px_52px] gap-1 px-2 py-1 items-center border-b border-gray-800/50">
+<span class="w-3 h-3 rounded bg-cyan-500/20 text-cyan-400 text-[7px] font-bold text-center leading-3">M</span><span class="text-gray-300 font-medium truncate">CPE-Lodge-47</span><span class="text-gray-500 font-mono">10.44.32.47</span><span class="text-[8px] text-green-400 bg-green-500/10 rounded-full px-1.5 text-center">Client</span><span class="text-[8px] text-green-400">&#9679; On</span><span class="text-gray-500">MikroTik</span>
+</div>
+<div class="grid grid-cols-[20px_1fr_90px_55px_50px_52px] gap-1 px-2 py-1 items-center">
+<span class="w-3 h-3 rounded bg-blue-500/20 text-blue-400 text-[7px] font-bold text-center leading-3">U</span><span class="text-gray-300 font-medium truncate">CPE-Harbour-12</span><span class="text-gray-500 font-mono">10.44.36.12</span><span class="text-[8px] text-green-400 bg-green-500/10 rounded-full px-1.5 text-center">Client</span><span class="text-[8px] text-green-400">&#9679; On</span><span class="text-gray-500">Ubiquiti</span>
+</div>
+</div>
+<div class="text-[9px] text-gray-600 mt-1.5 text-right">Showing 1–50 of 1,247</div>
+</div>
+
+<!-- Slide 3: Wireless -->
+<div class="hero-s absolute inset-0 px-5 pb-3 opacity-0 transition-opacity duration-500" data-title="Wireless Clients &mdash; 865 connected">
+<div class="flex gap-2 mb-2 flex-wrap">
+<div class="bg-cyan-500/10 rounded-lg px-2 py-1 text-center"><div class="text-sm font-bold text-cyan-400">865</div><div class="text-[8px] text-gray-500">Total</div></div>
+<div class="bg-green-500/10 rounded-lg px-2 py-1 text-center"><div class="text-sm font-bold text-green-400">842</div><div class="text-[8px] text-gray-500">Online</div></div>
+<div class="bg-purple-500/10 rounded-lg px-2 py-1 text-center"><div class="text-sm font-bold text-purple-400">86</div><div class="text-[8px] text-gray-500">Towers</div></div>
+<div class="bg-amber-500/10 rounded-lg px-2 py-1 text-center"><div class="text-sm font-bold text-amber-400">23</div><div class="text-[8px] text-gray-500">Weak</div></div>
+<div class="bg-red-500/10 rounded-lg px-2 py-1 text-center"><div class="text-sm font-bold text-red-400">5</div><div class="text-[8px] text-gray-500">Critical</div></div>
+</div>
+<div class="space-y-1.5">
+<div class="bg-gray-800/50 rounded-lg p-2">
+<div class="flex items-center gap-2 mb-1.5"><div class="w-2 h-2 rounded-full bg-green-400"></div><span class="text-[11px] text-gray-300 font-semibold">BTS-Central-01</span><span class="text-[9px] text-cyan-400 ml-auto">14 clients</span><span class="text-[9px] text-green-400 font-mono">-62 avg</span></div>
+<div class="space-y-0.5 pl-4">
+<div class="flex items-center gap-1.5"><span class="text-[9px] bg-green-500/20 text-green-400 rounded px-1 font-mono">-54</span><span class="text-[9px] text-gray-500">CPE-Office-Park-01</span><span class="text-[8px] text-gray-600 ml-auto font-mono">E4:8D:8C:xx:xx:A1</span></div>
+<div class="flex items-center gap-1.5"><span class="text-[9px] bg-green-500/20 text-green-400 rounded px-1 font-mono">-58</span><span class="text-[9px] text-gray-500">CPE-School-Admin</span><span class="text-[8px] text-gray-600 ml-auto font-mono">48:8F:5A:xx:xx:B2</span></div>
+<div class="flex items-center gap-1.5"><span class="text-[9px] bg-amber-500/20 text-amber-400 rounded px-1 font-mono">-67</span><span class="text-[9px] text-gray-500">CPE-Farm-219</span><span class="text-[8px] text-gray-600 ml-auto font-mono">CC:2D:E0:xx:xx:C3</span></div>
+<div class="flex items-center gap-1.5"><span class="text-[9px] bg-orange-500/20 text-orange-400 rounded px-1 font-mono">-76</span><span class="text-[9px] text-gray-500">CPE-Lodge-47</span><span class="text-[8px] text-gray-600 ml-auto font-mono">F4:A2:6D:xx:xx:D4</span></div>
+</div>
+</div>
+<div class="bg-gray-800/50 rounded-lg p-2">
+<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-green-400"></div><span class="text-[11px] text-gray-300 font-semibold">BTS-Valley-02</span><span class="text-[9px] text-cyan-400 ml-auto">22 clients</span><span class="text-[9px] text-green-400 font-mono">-57 avg</span></div>
+</div>
+<div class="bg-gray-800/50 rounded-lg p-2">
+<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-red-400"></div><span class="text-[11px] text-gray-300 font-semibold">BTS-Hilltop-01</span><span class="text-[9px] text-gray-500 ml-auto">0 clients</span><span class="text-[9px] text-red-400 font-mono">Offline</span></div>
+</div>
+<div class="bg-gray-800/50 rounded-lg p-2">
+<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-green-400"></div><span class="text-[11px] text-gray-300 font-semibold">BTS-Coast-01</span><span class="text-[9px] text-cyan-400 ml-auto">18 clients</span><span class="text-[9px] text-amber-400 font-mono">2 weak</span></div>
+</div>
+</div>
+</div>
+
+<!-- Slide 4: Zabbix -->
+<div class="hero-s absolute inset-0 px-5 pb-3 opacity-0 transition-opacity duration-500" data-title="Zabbix Integration">
+<div class="grid grid-cols-3 gap-2 mb-3">
+<div class="bg-green-500/10 rounded-lg p-2 text-center"><div class="text-lg font-bold text-green-400">1,198</div><div class="text-[9px] text-gray-500">Synced</div></div>
+<div class="bg-red-500/10 rounded-lg p-2 text-center"><div class="text-lg font-bold text-red-400">3</div><div class="text-[9px] text-gray-500">Links Down</div></div>
+<div class="bg-amber-500/10 rounded-lg p-2 text-center"><div class="text-lg font-bold text-amber-400">9</div><div class="text-[9px] text-gray-500">Triggers</div></div>
+</div>
+<div class="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Active Triggers</div>
+<div class="space-y-1">
+<div class="flex items-start gap-2 bg-red-500/5 rounded px-2 py-1"><span class="text-[8px] bg-red-500/20 text-red-400 rounded px-1 font-semibold mt-0.5 flex-shrink-0">DISASTER</span><div><div class="text-[10px] text-gray-300">BTS-Hilltop-01: Unavailable by ICMP</div><div class="text-[8px] text-gray-600">14m &bull; 10.44.12.1</div></div></div>
+<div class="flex items-start gap-2 bg-orange-500/5 rounded px-2 py-1"><span class="text-[8px] bg-orange-500/20 text-orange-400 rounded px-1 font-semibold mt-0.5 flex-shrink-0">HIGH</span><div><div class="text-[10px] text-gray-300">AP-Riverside-14: Unavailable by ICMP</div><div class="text-[8px] text-gray-600">40m &bull; 10.44.18.22</div></div></div>
+<div class="flex items-start gap-2 bg-amber-500/5 rounded px-2 py-1"><span class="text-[8px] bg-amber-500/20 text-amber-400 rounded px-1 font-semibold mt-0.5 flex-shrink-0">AVERAGE</span><div><div class="text-[10px] text-gray-300">BTS-Central-03: CPU &gt; 85%</div><div class="text-[8px] text-gray-600">2h 12m &bull; Current: 91%</div></div></div>
+<div class="flex items-start gap-2 bg-amber-500/5 rounded px-2 py-1"><span class="text-[8px] bg-amber-500/20 text-amber-400 rounded px-1 font-semibold mt-0.5 flex-shrink-0">AVERAGE</span><div><div class="text-[10px] text-gray-300">CPE-Sunrise-88: Signal -86 dBm</div><div class="text-[8px] text-gray-600">6h &bull; Threshold -75 dBm</div></div></div>
+<div class="flex items-start gap-2 bg-amber-500/5 rounded px-2 py-1"><span class="text-[8px] bg-amber-500/20 text-amber-400 rounded px-1 font-semibold mt-0.5 flex-shrink-0">AVERAGE</span><div><div class="text-[10px] text-gray-300">CPE-Creek-67: Signal -89 dBm</div><div class="text-[8px] text-gray-600">3h &bull; Threshold -75 dBm</div></div></div>
+</div>
+</div>
+
+<!-- Slide 5: Task Scheduler -->
+<div class="hero-s absolute inset-0 px-5 pb-3 opacity-0 transition-opacity duration-500" data-title="Task Scheduler">
+<div class="bg-blue-500/8 border border-blue-500/20 rounded-lg p-2.5 mb-2.5">
+<div class="flex items-center gap-2 mb-1"><span class="text-blue-400 text-xs" style="animation:pulse 2s infinite">&#9889;</span><span class="text-[10px] text-gray-300 font-semibold">Task Running</span><span class="text-[8px] bg-cyan-500/15 text-cyan-400 rounded-full px-1.5">1m 24s</span></div>
+<div class="w-full bg-gray-700/50 rounded-full h-1.5 mb-1"><div class="h-1.5 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400" style="width:68%"></div></div>
+<div class="flex gap-3 text-[8px]"><span class="text-blue-400">&#9679; 2 Executing</span><span class="text-amber-400">&#9679; 3 Pending</span><span class="text-green-400">&#10003; 12 Success</span><span class="text-red-400">&#10007; 1 Failed</span><span class="text-gray-500 ml-auto">68%</span></div>
+</div>
+<div class="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Scheduled Tasks</div>
+<div class="bg-gray-800/50 rounded-lg overflow-hidden text-[10px]">
+<div class="flex items-center gap-2 px-2 py-1.5 border-b border-gray-700/50">
+<div class="w-6 h-3 rounded-full bg-cyan-500 relative"><div class="absolute w-2 h-2 rounded-full bg-white top-0.5 right-0.5"></div></div>
+<span class="text-gray-300 font-medium">Nightly Bandwidth Reset</span><span class="text-[8px] text-cyan-400 font-mono ml-auto bg-gray-900/60 px-1 rounded">Daily 00:00</span>
+</div>
+<div class="flex items-center gap-2 px-2 py-1.5 border-b border-gray-700/50">
+<div class="w-6 h-3 rounded-full bg-cyan-500 relative"><div class="absolute w-2 h-2 rounded-full bg-white top-0.5 right-0.5"></div></div>
+<span class="text-gray-300 font-medium">Weekly DNS Flush</span><span class="text-[8px] text-cyan-400 font-mono ml-auto bg-gray-900/60 px-1 rounded">Mon 03:00</span>
+</div>
+<div class="flex items-center gap-2 px-2 py-1.5 border-b border-gray-700/50">
+<div class="w-6 h-3 rounded-full bg-cyan-500 relative"><div class="absolute w-2 h-2 rounded-full bg-white top-0.5 right-0.5"></div></div>
+<span class="text-gray-300 font-medium">Firmware Check</span><span class="text-[8px] text-cyan-400 font-mono ml-auto bg-gray-900/60 px-1 rounded">Wed 02:00</span>
+</div>
+<div class="flex items-center gap-2 px-2 py-1.5">
+<div class="w-6 h-3 rounded-full bg-gray-600 relative"><div class="absolute w-2 h-2 rounded-full bg-gray-400 top-0.5 left-0.5"></div></div>
+<span class="text-gray-500 font-medium">Monthly Reboot</span><span class="text-[8px] text-gray-600 font-mono ml-auto bg-gray-900/60 px-1 rounded">1st 04:00</span>
+</div>
+</div>
+<div class="flex gap-3 mt-2 text-[9px]"><span class="text-gray-500">&#128196; 8 Scripts</span><span class="text-green-400">&#10003; 347 Successful</span><span class="text-red-400">&#10007; 12 Failed</span></div>
+</div>
+
+<!-- Slide 6: Settings -->
+<div class="hero-s absolute inset-0 px-5 pb-3 opacity-0 transition-opacity duration-500" data-title="Settings">
 <div class="space-y-2">
-<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-green-400"></div><span class="text-xs text-gray-400">Tower Alpha &mdash; 32 clients</span><span class="text-xs text-green-400 ml-auto">-62 dBm</span></div>
-<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-green-400"></div><span class="text-xs text-gray-400">Tower Bravo &mdash; 28 clients</span><span class="text-xs text-green-400 ml-auto">-58 dBm</span></div>
-<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-yellow-400"></div><span class="text-xs text-gray-400">Tower Charlie &mdash; 41 clients</span><span class="text-xs text-yellow-400 ml-auto">-74 dBm</span></div>
+<div class="bg-gray-800/50 rounded-lg p-2.5">
+<div class="text-[10px] text-gray-300 font-semibold mb-1">&#127970; Company Branding</div>
+<div class="grid grid-cols-2 gap-2"><div><div class="text-[8px] text-gray-500 mb-0.5">Company Name</div><div class="text-[10px] text-gray-300 bg-gray-900/60 rounded px-1.5 py-0.5">Demo ISP Solutions</div></div><div><div class="text-[8px] text-gray-500 mb-0.5">Logo</div><div class="flex items-center gap-1.5"><div class="w-5 h-5 rounded bg-gradient-to-br from-blue-500 to-cyan-400 text-[7px] text-white font-bold flex items-center justify-center">D</div><span class="text-[8px] text-cyan-400">Uploaded</span></div></div></div>
+</div>
+<div class="bg-gray-800/50 rounded-lg p-2.5">
+<div class="text-[10px] text-gray-300 font-semibold mb-1">&#128231; Email Alerts (SMTP)</div>
+<div class="grid grid-cols-2 gap-2"><div><div class="text-[8px] text-gray-500 mb-0.5">SMTP Host</div><div class="text-[10px] text-gray-300 bg-gray-900/60 rounded px-1.5 py-0.5">smtp.example.com</div></div><div><div class="text-[8px] text-gray-500 mb-0.5">Port</div><div class="text-[10px] text-gray-300 bg-gray-900/60 rounded px-1.5 py-0.5">587</div></div></div>
+</div>
+<div class="bg-gray-800/50 rounded-lg p-2.5">
+<div class="flex items-center justify-between mb-1"><span class="text-[10px] text-gray-300 font-semibold">&#128225; Zabbix Integration</span><div class="w-6 h-3 rounded-full bg-cyan-500 relative"><div class="absolute w-2 h-2 rounded-full bg-white top-0.5 right-0.5"></div></div></div>
+<div class="flex items-center gap-2"><span class="text-[9px] bg-green-500/15 text-green-400 rounded-full px-1.5">&#9679; Connected</span><span class="text-[8px] text-gray-500">1,198 hosts synced</span></div>
+</div>
+<div class="bg-gray-800/50 rounded-lg p-2.5">
+<div class="text-[10px] text-gray-300 font-semibold mb-1">&#128246; Alert Thresholds</div>
+<div class="grid grid-cols-2 gap-2"><div><div class="text-[8px] text-gray-500 mb-0.5">Signal Threshold</div><div class="text-[10px] text-gray-300 bg-gray-900/60 rounded px-1.5 py-0.5">-75 dBm</div></div><div><div class="text-[8px] text-gray-500 mb-0.5">Alert Cooldown</div><div class="text-[10px] text-gray-300 bg-gray-900/60 rounded px-1.5 py-0.5">30 min</div></div></div>
+</div>
+<div class="bg-gray-800/50 rounded-lg p-2.5">
+<div class="flex items-center gap-2"><span class="text-green-400">&#10003;</span><div><div class="text-[10px] text-green-400 font-semibold">Licensed &mdash; Professional</div><div class="text-[8px] text-gray-500">Valid until 2027-03-13 &bull; 2,000 devices</div></div></div>
+</div>
+</div>
+</div>
+
+</div>
+<!-- Nav dots -->
+<div class="flex items-center justify-center gap-1.5 py-2">
+<div class="hero-dot w-1.5 h-1.5 rounded-full bg-blue-400 cursor-pointer transition-all" data-i="0"></div>
+<div class="hero-dot w-1.5 h-1.5 rounded-full bg-gray-600 cursor-pointer transition-all" data-i="1"></div>
+<div class="hero-dot w-1.5 h-1.5 rounded-full bg-gray-600 cursor-pointer transition-all" data-i="2"></div>
+<div class="hero-dot w-1.5 h-1.5 rounded-full bg-gray-600 cursor-pointer transition-all" data-i="3"></div>
+<div class="hero-dot w-1.5 h-1.5 rounded-full bg-gray-600 cursor-pointer transition-all" data-i="4"></div>
+<div class="hero-dot w-1.5 h-1.5 rounded-full bg-gray-600 cursor-pointer transition-all" data-i="5"></div>
 </div>
 </div>
 </div>
@@ -610,6 +773,24 @@ document.getElementById('contact-form')?.addEventListener('submit', async(e)=>{
   }
   btn.textContent='Send Message';btn.disabled=false;
 });
+// Hero slideshow
+(function(){
+  const ss=document.querySelectorAll('.hero-s');
+  const dots=document.querySelectorAll('.hero-dot');
+  const title=document.getElementById('hero-slide-title');
+  if(!ss.length)return;
+  let cur=0;
+  function go(i){
+    ss[cur].classList.remove('active');ss[cur].style.opacity='0';
+    dots[cur].classList.remove('bg-blue-400');dots[cur].classList.add('bg-gray-600');
+    cur=((i%ss.length)+ss.length)%ss.length;
+    ss[cur].classList.add('active');ss[cur].style.opacity='1';
+    dots[cur].classList.remove('bg-gray-600');dots[cur].classList.add('bg-blue-400');
+    if(title)title.textContent=ss[cur].dataset.title||'';
+  }
+  dots.forEach(d=>d.addEventListener('click',()=>go(+d.dataset.i)));
+  setInterval(()=>go(cur+1),4000);
+})();
 // Counter animation
 const counters=document.querySelectorAll('.counter');
 const io=new IntersectionObserver(entries=>{entries.forEach(ent=>{if(ent.isIntersecting){
